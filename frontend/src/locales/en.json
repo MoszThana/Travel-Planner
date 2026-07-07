@@ -1,0 +1,132 @@
+{
+  "common": {
+    "app_title": "Antigravity Travel Planner",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "add": "Add",
+    "loading": "Loading...",
+    "edit": "Edit",
+    "back": "Back",
+    "confirm": "Confirm",
+    "success": "Success!",
+    "error": "Error"
+  },
+  "nav": {
+    "home": "Home",
+    "map": "Map",
+    "budget": "Budget",
+    "group": "Group",
+    "ai_assistant": "AI Assist"
+  },
+  "auth": {
+    "login": "Sign In",
+    "logout": "Sign Out",
+    "welcome": "Welcome back",
+    "username": "Username",
+    "enter_username": "Enter your username to test profiles",
+    "guest_mode": "Continue as Guest"
+  },
+  "dashboard": {
+    "my_trips": "My Trips",
+    "create_new_trip": "Create New Trip",
+    "no_trips": "No trips planned yet. Let's create one!",
+    "days_count": "{count} Days",
+    "starts_on": "Starts: {date}"
+  },
+  "trip_form": {
+    "title": "Plan a New Journey",
+    "trip_name": "Trip Name",
+    "trip_name_placeholder": "e.g., Tokyo Summer Adventure",
+    "destination": "Destination City/Country",
+    "destination_placeholder": "e.g., Tokyo, Japan",
+    "start_date": "Start Date",
+    "end_date": "End Date",
+    "submit": "Create Plan"
+  },
+  "itinerary": {
+    "timeline": "Trip Timeline",
+    "day": "Day {number}",
+    "add_activity": "Add Activity",
+    "no_activities": "No activities scheduled for this day yet.",
+    "time": "Time",
+    "activity_name": "Activity Name",
+    "notes": "Notes",
+    "est_cost": "Estimated Cost",
+    "act_cost": "Actual Cost",
+    "transport": "Transportation",
+    "transport_walk": "Walk",
+    "transport_car": "Car",
+    "transport_train": "Train",
+    "transport_flight": "Flight",
+    "transport_bus": "Bus",
+    "transport_other": "Other",
+    "visited": "Visited",
+    "mark_visited": "Check-in",
+    "not_visited": "Upcoming",
+    "drag_tooltip": "Hold and drag to reorder activities"
+  },
+  "map_planner": {
+    "title": "Map Planning",
+    "search_placeholder": "Search places on map...",
+    "show_route": "Show Route",
+    "optimize_route": "Optimize Route",
+    "original_route": "Original Route",
+    "optimized_route": "Optimized Route",
+    "apply_optimization": "Apply Optimized Route",
+    "nearby_places": "Nearby Spots",
+    "no_key_warning": "Google Maps API Key not loaded. Using interactive map mock."
+  },
+  "budget": {
+    "title": "Budget Tracker",
+    "total_budget": "Total Budget",
+    "actual_spent": "Actual Spent",
+    "remaining": "Remaining",
+    "daily_average": "Daily Average",
+    "cost_per_person": "Cost Per Person",
+    "categories": {
+      "food": "Food & Dining",
+      "transport": "Transportation",
+      "hotel": "Accommodation",
+      "activity": "Tickets & Activities",
+      "shopping": "Shopping",
+      "emergency": "Emergency",
+      "other": "Others"
+    }
+  },
+  "group": {
+    "title": "Group Expense Settlement",
+    "members": "Group Members",
+    "add_member": "Add Member",
+    "member_name": "Name",
+    "paid_by": "Paid By",
+    "shared_by": "Shared By",
+    "amount": "Amount",
+    "equal_split": "Split Equally",
+    "custom_split": "Custom Split",
+    "who_owes_whom": "Settlement Summary",
+    "owes": "owes",
+    "no_debts": "All expenses are settled!"
+  },
+  "ai": {
+    "title": "Gemini AI Helper",
+    "smart_gap": "Smart Schedule Checks",
+    "recommendations": "AI Nearby Suggestions",
+    "cost_predictor": "AI Cost Estimates",
+    "gap_no_issues": "No timeline issues detected. Your schedule looks realistic!",
+    "gap_detected": "Alert: {type} detected.",
+    "predict_cost": "Predict Cost",
+    "ai_estimate_range": "AI Estimated Range: {range}"
+  },
+  "emergency": {
+    "title": "Emergency Info",
+    "local_numbers": "Local Emergency Numbers",
+    "police": "Police",
+    "medical": "Medical/Ambulance",
+    "fire": "Fire Department",
+    "hotel_address": "Hotel Address & Phone",
+    "embassy_info": "Embassy Contact Info",
+    "medical_notes": "Medical & Allergy Notes",
+    "add_contact": "Add Emergency Contact"
+  }
+}

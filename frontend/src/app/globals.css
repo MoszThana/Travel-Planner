@@ -1,0 +1,137 @@
+:root {
+  /* Color Palette - Vibrant Modern Minimalist */
+  --primary: #4f46e5;         /* Electric Indigo */
+  --primary-light: #818cf8;
+  --secondary: #06b6d4;       /* Vivid Cyan */
+  --secondary-light: #67e8f9;
+  --accent: #f43f5e;          /* Rose Pink (for alerts/warnings) */
+  --background: #f8fafc;      /* Soft Light Gray-Blue */
+  --surface: #ffffff;         /* Pure White Cards */
+  --text: #0f172a;            /* Dark Slate Text */
+  --text-muted: #64748b;      /* Muted Slate Text */
+  --border: #e2e8f0;          /* Light Slate Border */
+  --hover: #f1f5f9;           /* Light Hover state */
+  
+  /* Glassmorphism Styles */
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.4);
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+  
+  /* Layout Sizing & Safe Areas */
+  --nav-height: 70px;
+  --status-bar-height: 0px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --font-family: 'Inter', 'Noto Sans Thai', sans-serif;
+  
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0f172a;    /* Deep Dark Slate */
+    --surface: #1e293b;       /* Darker Slate Card */
+    --text: #f8fafc;          /* White Text */
+    --text-muted: #94a3b8;    /* Muted Slate Text */
+    --border: #334155;        /* Darker Slate Border */
+    --hover: #334155;
+    
+    --glass-bg: rgba(30, 41, 59, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  }
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  -webkit-tap-highlight-color: transparent; /* Disable tap highlight on mobile */
+  font-family: var(--font-family);
+}
+
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  background-color: var(--background);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  min-height: 100vh;
+  min-height: -webkit-fill-available; /* Fill mobile screen fully including navigation bars */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Typography Utilities */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--text);
+}
+
+p {
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* Glassmorphism Classes */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--glass-shadow);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+@media (hover: hover) {
+  .glass-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary-light);
+  }
+}
+
+/* Mobile-First Layout Helper */
+.app-container {
+  width: 100%;
+  max-width: 600px; /* Constrain desktop screen to mimic a mobile phone UI */
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--background);
+  position: relative;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.05);
+  padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 16px);
+}
+
+/* Scrollbar Customization */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}

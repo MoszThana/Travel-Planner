@@ -1,0 +1,193 @@
+.container {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeIn 0.25s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.sectionCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: var(--glass-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Members horizontal list */
+.memberList {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 4px 0;
+}
+
+.memberItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.memberAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  padding: 2px;
+}
+
+.memberName {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Debts / settlements layout */
+.debtList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.debtItem {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.debtActor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.debtArrow {
+  color: var(--primary);
+  font-weight: 800;
+}
+
+.debtAmount {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+/* Pending Approvals Queue */
+.approvalCard {
+  border-left: 4px solid var(--secondary);
+  background: rgba(6, 182, 212, 0.05);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+}
+
+.approvalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.suggestedBy {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--secondary);
+  background: rgba(6, 182, 212, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.actionRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.approveBtn {
+  flex: 1;
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rejectBtn {
+  background: var(--hover);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Modal form Split Checkboxes */
+.checkboxGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.checkboxItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--background);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.customSplitInput {
+  width: 80px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  text-align: right;
+  font-weight: 700;
+  font-size: 12px;
+}

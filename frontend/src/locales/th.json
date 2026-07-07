@@ -1,0 +1,132 @@
+{
+  "common": {
+    "app_title": "Antigravity เครื่องมือวางแผนท่องเที่ยว",
+    "save": "บันทึก",
+    "cancel": "ยกเลิก",
+    "delete": "ลบ",
+    "add": "เพิ่ม",
+    "loading": "กำลังโหลด...",
+    "edit": "แก้ไข",
+    "back": "ย้อนกลับ",
+    "confirm": "ยืนยัน",
+    "success": "สำเร็จ!",
+    "error": "ข้อผิดพลาด"
+  },
+  "nav": {
+    "home": "หน้าแรก",
+    "map": "แผนที่",
+    "budget": "งบประมาณ",
+    "group": "แชร์ค่าใช้จ่าย",
+    "ai_assistant": "ผู้ช่วย AI"
+  },
+  "auth": {
+    "login": "เข้าสู่ระบบ",
+    "logout": "ออกจากระบบ",
+    "welcome": "ยินดีต้อนรับกลับมา",
+    "username": "ชื่อผู้ใช้",
+    "enter_username": "กรอกชื่อผู้ใช้สำหรับทดสอบบัญชี",
+    "guest_mode": "ใช้งานแบบผู้เยี่ยมชม"
+  },
+  "dashboard": {
+    "my_trips": "ทริปของฉัน",
+    "create_new_trip": "สร้างทริปใหม่",
+    "no_trips": "ยังไม่มีการวางแผนทริป เริ่มสร้างกันเลย!",
+    "days_count": "{count} วัน",
+    "starts_on": "เริ่มต้น: {date}"
+  },
+  "trip_form": {
+    "title": "วางแผนการเดินทางใหม่",
+    "trip_name": "ชื่อทริป",
+    "trip_name_placeholder": "เช่น ทริปตะลุยโตเกียวฤดูร้อน",
+    "destination": "เมือง/ประเทศ ปลายทาง",
+    "destination_placeholder": "เช่น โตเกียว, ประเทศญี่ปุ่น",
+    "start_date": "วันเริ่มเดินทาง",
+    "end_date": "วันสิ้นสุดเดินทาง",
+    "submit": "สร้างแผนการเดินทาง"
+  },
+  "itinerary": {
+    "timeline": "แผนการเดินทางรายวัน",
+    "day": "วันที่ {number}",
+    "add_activity": "เพิ่มกิจกรรม",
+    "no_activities": "ยังไม่มีกิจกรรมในวันนี้",
+    "time": "เวลา",
+    "activity_name": "ชื่อกิจกรรม/สถานที่",
+    "notes": "บันทึกเพิ่มเติม",
+    "est_cost": "ประมาณการค่าใช้จ่าย",
+    "act_cost": "ค่าใช้จ่ายจริง",
+    "transport": "การเดินทาง",
+    "transport_walk": "เดิน",
+    "transport_car": "รถยนต์",
+    "transport_train": "รถไฟ",
+    "transport_flight": "เครื่องบิน",
+    "transport_bus": "รถบัส",
+    "transport_other": "อื่นๆ",
+    "visited": "เช็คอินแล้ว",
+    "mark_visited": "เช็คอิน",
+    "not_visited": "แผนงานถัดไป",
+    "drag_tooltip": "กดค้างและลากเพื่อสลับลำดับกิจกรรม"
+  },
+  "map_planner": {
+    "title": "วางแผนแผนที่",
+    "search_placeholder": "ค้นหาตำแหน่งบนแผนที่...",
+    "show_route": "แสดงเส้นทาง",
+    "optimize_route": "แนะนำลำดับเส้นทางที่ดีที่สุด",
+    "original_route": "เส้นทางเดิม",
+    "optimized_route": "เส้นทางที่ปรับให้มีประสิทธิภาพขึ้น",
+    "apply_optimization": "ใช้การปรับปรุงเส้นทางนี้",
+    "nearby_places": "สถานที่น่าสนใจใกล้เคียง",
+    "no_key_warning": "ไม่พบ Google Maps API Key จะใช้แผนที่จำลองทดแทน"
+  },
+  "budget": {
+    "title": "ตัวติดตามงบประมาณ",
+    "total_budget": "งบประมาณทั้งหมด",
+    "actual_spent": "จ่ายไปแล้ว",
+    "remaining": "งบประมาณคงเหลือ",
+    "daily_average": "เฉลี่ยต่อวัน",
+    "cost_per_person": "เฉลี่ยต่อคน",
+    "categories": {
+      "food": "อาหารและเครื่องดื่ม",
+      "transport": "การเดินทาง",
+      "hotel": "ที่พัก",
+      "activity": "บัตรผ่าน/กิจกรรม",
+      "shopping": "ช้อปปิ้ง",
+      "emergency": "ฉุกเฉิน",
+      "other": "อื่นๆ"
+    }
+  },
+  "group": {
+    "title": "จัดการค่าใช้จ่ายกลุ่ม",
+    "members": "สมาชิกกลุ่ม",
+    "add_member": "เพิ่มสมาชิก",
+    "member_name": "ชื่อสมาชิก",
+    "paid_by": "คนจ่ายเงิน",
+    "shared_by": "คนหารด้วย",
+    "amount": "จำนวนเงิน",
+    "equal_split": "หารเท่ากัน",
+    "custom_split": "ระบุจำนวนเอง",
+    "who_owes_whom": "สรุปการคืนเงิน",
+    "owes": "ต้องจ่ายให้",
+    "no_debts": "เคลียร์ยอดหมดแล้ว ไม่มีใครค้างชำระ!"
+  },
+  "ai": {
+    "title": "ผู้ช่วยอัจฉริยะ Gemini AI",
+    "smart_gap": "ตรวจสอบความสมเหตุสมผลของเวลา",
+    "recommendations": "สถานที่ท่องเที่ยวใกล้เคียงแนะนำโดย AI",
+    "cost_predictor": "ประมาณการค่าใช้จ่ายโดย AI",
+    "gap_no_issues": "ตารางเวลาของคุณดูสมบูรณ์ดี ไม่พบจุดทับซ้อนหรือเวลาการเดินทางที่ไม่สมจริง!",
+    "gap_detected": "แจ้งเตือน: ตรวจพบ {type}",
+    "predict_cost": "วิเคราะห์ราคา",
+    "ai_estimate_range": "ราคาแนะนำโดย AI: {range}"
+  },
+  "emergency": {
+    "title": "ข้อมูลติดต่อฉุกเฉิน",
+    "local_numbers": "เบอร์โทรฉุกเฉินท้องถิ่น",
+    "police": "สถานีตำรวจ",
+    "medical": "หน่วยกู้ชีพ/โรงพยาบาล",
+    "fire": "สถานีดับเพลิง",
+    "hotel_address": "ที่อยู่และเบอร์โทรที่พัก",
+    "embassy_info": "ข้อมูลติดต่อสถานทูต",
+    "medical_notes": "บันทึกโรคประจำตัว/ยาที่แพ้",
+    "add_contact": "เพิ่มข้อมูลติดต่อฉุกเฉิน"
+  }
+}

@@ -1,0 +1,33 @@
+# Dependency directories
+node_modules/
+/frontend/node_modules/
+/backend/node_modules/
+
+# Next.js build output
+/frontend/.next/
+/frontend/out/
+
+# Environment files
+.env
+.env.local
+.env*.local
+/frontend/.env.local
+/backend/.env.local
+
+# Database files
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+/backend/dev.db
+
+# Cloudflare / Wrangler output
+.wrangler/
+dist/
+.open-next/
+
+# IDE / System files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
