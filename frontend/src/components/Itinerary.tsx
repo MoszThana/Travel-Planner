@@ -16,10 +16,10 @@ interface ItineraryProps {
 export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh }) => {
   const { t } = useTranslation();
   const { user } = useAuth();
-  
   const [activeDayIdx, setActiveDayIdx] = useState(0);
   const [showAddForm, setShowAddForm] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<any | null>(null);
 
   // Form Fields
   const [name, setName] = useState('');
@@ -69,6 +69,30 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
   }, [activeDayIdx, trip.activities]);
 
   if (!isMounted) return <div style={{ padding: 24, textAlign: 'center' }}>{t('common.loading')}</div>;
+
+  const handleEditClick = (act: any) => {
+    setEditingActivity(act);
+    setName(act.name);
+    setTime(act.time || '12:00');
+    setLocation(act.location || '');
+    setNotes(act.notes || '');
+    setTransportType(act.transportType || 'walk');
+    setEstCost(String(act.estCost || 0));
+    setCostCategory(act.costCategory || 'other');
+    setShowAddForm(true);
+  };
+
+  const handleCloseForm = () => {
+    setEditingActivity(null);
+    setName('');
+    setTime('12:00');
+    setLocation('');
+    setNotes('');
+    setEstCost('0');
+    setCostCategory('other');
+    setTransportType('walk');
+    setShowAddForm(false);
+  };
 
   const handleDragEnd = async (result: DropResult) => {
     if (!result.destination || !trip.activities) return;
@@ -132,26 +156,39 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
       transportType,
       estCost: parseFloat(estCost) || 0,
       costCategory,
-      order: newOrder
+      order: editingActivity ? editingActivity.order : newOrder
     };
 
     try {
-      await apiRequest('/activities', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
+      if (editingActivity) {
+        await apiRequest(`/activities/${editingActivity.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+      } else {
+        await apiRequest('/activities', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+      }
     } catch (err) {
       console.warn('Saving activity offline...');
       const offlineTrips = JSON.parse(localStorage.getItem('offline_trips') || '[]');
       const offlineTrip = offlineTrips.find((t: any) => t.id === trip.id);
       if (offlineTrip) {
         offlineTrip.activities = offlineTrip.activities || [];
-        offlineTrip.activities.push({
-          id: `act-${Date.now()}`,
-          ...payload,
-          actCost: 0,
-          visited: 0
-        });
+        if (editingActivity) {
+          offlineTrip.activities = offlineTrip.activities.map((a: any) =>
+            a.id === editingActivity.id ? { ...a, ...payload } : a
+          );
+        } else {
+          offlineTrip.activities.push({
+            id: `act-${Date.now()}`,
+            ...payload,
+            actCost: 0,
+            visited: 0
+          });
+        }
         localStorage.setItem('offline_trips', JSON.stringify(offlineTrips));
       }
     }
@@ -163,6 +200,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
     setEstCost('0');
     setCostCategory('other');
     setTransportType('walk');
+    setEditingActivity(null);
     setShowAddForm(false);
     setSaving(false);
     onRefresh();
@@ -372,14 +410,22 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
                                   {act.name}
                                 </h4>
                               </div>
-                              <button className={styles.deleteBtn} onClick={() => handleDeleteActivity(act.id)}>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                  <polyline points="3 6 5 6 21 6"></polyline>
-                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                  <line x1="10" y1="11" x2="10" y2="17"></line>
-                                  <line x1="14" y1="11" x2="14" y2="17"></line>
-                                </svg>
-                              </button>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <button className={styles.deleteBtn} style={{ color: 'var(--primary)' }} onClick={() => handleEditClick(act)}>
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4z"></path>
+                                  </svg>
+                                </button>
+                                <button className={styles.deleteBtn} onClick={() => handleDeleteActivity(act.id)}>
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                                  </svg>
+                                </button>
+                              </div>
                             </div>
 
                             {act.location && (
@@ -391,6 +437,31 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
                                 {act.location}
                               </div>
                             )}
+
+                            {/* Show transport mode and directions link if there is a previous activity to route from */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', background: 'var(--background)', padding: '6px 8px', borderRadius: '4px' }}>
+                              <span>
+                                {act.transportType === 'walk' ? '🚶 Walk' :
+                                 act.transportType === 'train' ? '🚆 Train' :
+                                 act.transportType === 'car' ? '🚗 Car' :
+                                 act.transportType === 'flight' ? '✈️ Flight' :
+                                 act.transportType === 'bus' ? '🚌 Bus' : '🚌 Transport'}
+                              </span>
+                              {index > 0 && activeDayActivities[index - 1].location && act.location && (
+                                <a 
+                                  href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(activeDayActivities[index - 1].location)}&destination=${encodeURIComponent(act.location)}&travelmode=${
+                                    act.transportType === 'walk' ? 'walking' :
+                                    act.transportType === 'car' ? 'driving' :
+                                    act.transportType === 'train' || act.transportType === 'bus' ? 'transit' : 'driving'
+                                  }`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ color: 'var(--secondary)', textDecoration: 'underline', fontWeight: '700' }}
+                                >
+                                  Map Directions →
+                                </a>
+                              )}
+                            </div>
 
                             {act.notes && (
                               <p className={styles.notes}>{act.notes}</p>
@@ -471,11 +542,11 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
         + {t('itinerary.add_activity')}
       </button>
 
-      {/* Add Activity Modal Sheet */}
+      {/* Add/Edit Activity Modal Sheet */}
       {showAddForm && (
-        <div className={styles.modalOverlay} onClick={() => setShowAddForm(false)}>
+        <div className={styles.modalOverlay} onClick={handleCloseForm}>
           <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h3 className={styles.tripTitle}>{t('itinerary.add_activity')}</h3>
+            <h3 className={styles.tripTitle}>{editingActivity ? 'Edit Activity' : t('itinerary.add_activity')}</h3>
             <form onSubmit={handleAddActivity} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div className={styles.formGroup}>
                 <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
@@ -587,7 +658,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
                 <button type="submit" disabled={saving} className={styles.addDayBtn} style={{ flex: 2, background: 'var(--primary)', color: 'white', border: 'none' }}>
                   {saving ? t('common.loading') : t('common.save')}
                 </button>
-                <button type="button" className={styles.addDayBtn} style={{ flex: 1 }} onClick={() => setShowAddForm(false)}>
+                <button type="button" className={styles.addDayBtn} style={{ flex: 1 }} onClick={handleCloseForm}>
                   {t('common.cancel')}
                 </button>
               </div>
