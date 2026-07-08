@@ -1,0 +1,9 @@
+name = "travel-planner-frontend"
+compatibility_date = "2024-11-01"
+pages_build_output_dir = ".next"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "travel_planner_db"
+database_id = "1f2a2fdd-fdc5-436b-905e-5d97dc2fbba8"
+migrations_dir = "drizzle/migrations"

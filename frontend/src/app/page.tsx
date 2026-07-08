@@ -21,7 +21,7 @@ export default function Home() {
   // Fetch all trips list
   const loadTrips = useCallback(async () => {
     try {
-      const data = await apiRequest('/trips');
+      const data = await apiRequest('/trips') as any[];
       setTrips(data);
       // Sync offline cache
       saveOfflineTrips(data);
@@ -36,7 +36,7 @@ export default function Home() {
   // Fetch specific trip full details (days, activities, budgets, splits)
   const loadTripDetails = useCallback(async (tripId: string) => {
     try {
-      const data = await apiRequest(`/trips/${tripId}`);
+      const data = await apiRequest(`/trips/${tripId}`) as any;
       setActiveTripDetails(data);
     } catch {
       console.warn(`Fetching details for trip ${tripId} failed, loading LocalStorage backup.`);

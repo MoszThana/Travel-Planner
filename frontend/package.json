@@ -3,25 +3,38 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
+    "dev": "next dev",
+    "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "pages:build": "npx @cloudflare/next-on-pages",
+    "pages:dev": "wrangler pages dev .vercel/output/static --compatibility-date=2024-11-01 --d1 DB",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply travel_planner_db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply travel_planner_db --remote"
   },
   "dependencies": {
+    "@google/genai": "^2.10.0",
     "@hello-pangea/dnd": "^18.0.1",
+    "@libsql/client": "^0.17.4",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
     "@react-google-maps/api": "^2.20.8",
+    "drizzle-orm": "^0.45.2",
     "next": "15.5.20",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },
   "devDependencies": {
+    "@cloudflare/next-on-pages": "^1.13.16",
+    "@cloudflare/workers-types": "^5.20260708.1",
     "@eslint/eslintrc": "^3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "15.5.20",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.108.0"
   }
 }

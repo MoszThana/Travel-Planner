@@ -6,6 +6,7 @@ import { useTranslation } from '@/context/TranslationContext';
 import { useAuth } from '@/context/AuthContext';
 import { apiRequest } from '@/utils/api';
 import styles from './Itinerary.module.css';
+import { AttachmentsModal } from './AttachmentsModal';
 
 interface ItineraryProps {
   trip: any;
@@ -18,6 +19,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
   const { user } = useAuth();
   const [activeDayIdx, setActiveDayIdx] = useState(0);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showAttachmentsModal, setShowAttachmentsModal] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [editingActivity, setEditingActivity] = useState<any | null>(null);
 
@@ -330,11 +332,14 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
 
   return (
     <div className={styles.container}>
-      <div className={styles.headerRow}>
+      <div className={styles.headerRow} style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '8px' }}>
         <button className={styles.backBtn} onClick={onBack}>
           ← {t('common.back')}
         </button>
-        <span className={styles.tripTitle}>{trip.name}</span>
+        <span className={styles.tripTitle} style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{trip.name}</span>
+        <button className={styles.addDayBtn} onClick={() => setShowAttachmentsModal(true)} style={{ margin: 0, padding: '6px 12px', fontSize: '13px', width: 'auto' }}>
+          📎 Files
+        </button>
       </div>
 
       {/* Day Navigation Tabs */}
@@ -666,6 +671,12 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
           </div>
         </div>
       )}
+
+      <AttachmentsModal 
+        tripId={trip.id} 
+        isOpen={showAttachmentsModal} 
+        onClose={() => setShowAttachmentsModal(false)} 
+      />
     </div>
   );
 };

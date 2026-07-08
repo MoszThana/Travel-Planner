@@ -1,7 +1,7 @@
-const BACKEND_URL = 'http://localhost:4000/api';
+const BACKEND_URL = '/api';
 
 // Simple API helper with LocalStorage fallback to guarantee working code even if backend is offline
-export async function apiRequest(endpoint: string, options: RequestInit = {}) {
+export async function apiRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
   try {
     const res = await fetch(`${BACKEND_URL}${endpoint}`, {
       ...options,
@@ -11,7 +11,7 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
       },
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
+      const err = await res.json().catch(() => ({})) as any;
       throw new Error(err.error || `HTTP error! status: ${res.status}`);
     }
     return await res.json();
