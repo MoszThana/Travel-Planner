@@ -1,6 +1,5 @@
 import { drizzle as drizzleD1 } from 'drizzle-orm/d1';
 import { drizzle as drizzleLibsql } from 'drizzle-orm/libsql';
-import { createClient } from '@libsql/client';
 import * as schema from './schema';
 
 export function getDb(env?: any) {
@@ -10,6 +9,7 @@ export function getDb(env?: any) {
   }
 
   // 2. Fallback to standard LibSQL file-based SQLite for local "next dev" development
+  const { createClient } = eval('require')('@libsql/client/node');
   const client = createClient({
     url: 'file:../backend/dev.db',
   });

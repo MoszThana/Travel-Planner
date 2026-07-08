@@ -7,3 +7,7 @@ binding = "DB"
 database_name = "travel_planner_db"
 database_id = "1f2a2fdd-fdc5-436b-905e-5d97dc2fbba8"
 migrations_dir = "drizzle/migrations"
+
+[[r2_buckets]]
+binding = "ATTACHMENTS_BUCKET"
+bucket_name = "travel-planner-attachments"

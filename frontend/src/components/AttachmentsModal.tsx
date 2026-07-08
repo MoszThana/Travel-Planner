@@ -27,12 +27,10 @@ export const AttachmentsModal: React.FC<AttachmentsModalProps> = ({ tripId, isOp
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [needsAuth, setNeedsAuth] = useState(false);
 
   const loadAttachments = useCallback(async () => {
     setLoading(true);
     setErrorMsg(null);
-    setNeedsAuth(false);
     try {
       const data = await apiRequest(`/upload?tripId=${tripId}`);
       setAttachments(data);
@@ -49,7 +47,6 @@ export const AttachmentsModal: React.FC<AttachmentsModalProps> = ({ tripId, isOp
       loadAttachments();
       setSelectedFile(null);
       setErrorMsg(null);
-      setNeedsAuth(false);
     }
   }, [isOpen, loadAttachments]);
 
@@ -65,7 +62,6 @@ export const AttachmentsModal: React.FC<AttachmentsModalProps> = ({ tripId, isOp
 
     setUploading(true);
     setErrorMsg(null);
-    setNeedsAuth(false);
 
     const formData = new FormData();
     formData.append('file', selectedFile);
@@ -89,11 +85,7 @@ export const AttachmentsModal: React.FC<AttachmentsModalProps> = ({ tripId, isOp
       loadAttachments();
     } catch (err: any) {
       console.error('Upload error:', err);
-      const msg = err.message || 'Failed to upload file to OneDrive.';
-      setErrorMsg(msg);
-      if (msg.toLowerCase().includes('refresh token') || msg.toLowerCase().includes('authenticate')) {
-        setNeedsAuth(true);
-      }
+      setErrorMsg(err.message || 'Failed to upload file.');
     } finally {
       setUploading(false);
     }
@@ -126,25 +118,13 @@ export const AttachmentsModal: React.FC<AttachmentsModalProps> = ({ tripId, isOp
         <div className={styles.header}>
           <div className={styles.titleGroup}>
             <span className={styles.icon}>📁</span>
-            <h3 className={styles.title}>Trip Files (OneDrive)</h3>
+            <h3 className={styles.title}>Trip Documents & Files</h3>
           </div>
           <button className={styles.closeBtn} onClick={onClose}>&times;</button>
         </div>
 
         <div className={styles.body}>
-          {/* OneDrive OAuth Onboarding Alert */}
-          {needsAuth && (
-            <div className={styles.authAlert}>
-              <p className={styles.alertText}>
-                ⚠️ OneDrive access is not authenticated or needs a refresh. Connect your Microsoft account to store trip files.
-              </p>
-              <a href="/api/auth/microsoft" className={styles.authBtn}>
-                🔐 Connect Microsoft OneDrive
-              </a>
-            </div>
-          )}
-
-          {errorMsg && !needsAuth && (
+          {errorMsg && (
             <div className={styles.errorAlert}>
               <span>❌ {errorMsg}</span>
             </div>
@@ -166,7 +146,7 @@ export const AttachmentsModal: React.FC<AttachmentsModalProps> = ({ tripId, isOp
                 onClick={handleUpload}
                 disabled={uploading}
               >
-                {uploading ? 'Uploading to OneDrive...' : '📤 Upload to OneDrive'}
+                {uploading ? 'Uploading file...' : '📤 Upload File'}
               </button>
             )}
           </div>
@@ -176,7 +156,7 @@ export const AttachmentsModal: React.FC<AttachmentsModalProps> = ({ tripId, isOp
           {/* Files List */}
           <h4 className={styles.sectionTitle}>Uploaded Files</h4>
           {loading ? (
-            <div className={styles.loadingState}>Loading files from OneDrive...</div>
+            <div className={styles.loadingState}>Loading files...</div>
           ) : attachments.length === 0 ? (
             <div className={styles.emptyState}>No receipts or vouchers uploaded yet.</div>
           ) : (
