@@ -3,13 +3,11 @@ import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
 
-export const runtime = 'edge';
-
 // PUT /api/activities/reorder - Bulk update order and day (Drag & Drop Reordering)
 export async function PUT(request: Request) {
   try {
     
-    const db = getSafeDb();
+    const db = await getSafeDb();
 
     const body = await request.json() as any;
     const { items } = body; // Array of { id, dayId, order }
@@ -33,4 +31,5 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
 

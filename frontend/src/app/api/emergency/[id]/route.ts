@@ -3,8 +3,6 @@ import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
 
-export const runtime = 'edge';
-
 // DELETE /api/emergency/[id] - Delete emergency contact
 export async function DELETE(
   request: Request,
@@ -14,7 +12,7 @@ export async function DELETE(
 
   try {
     
-    const db = getSafeDb();
+    const db = await getSafeDb();
 
     await db.delete(schema.emergencyContacts).where(eq(schema.emergencyContacts.id, id));
     return NextResponse.json({ success: true });

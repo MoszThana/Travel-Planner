@@ -3,8 +3,6 @@ import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
 
-export const runtime = 'edge';
-
 // DELETE /api/expenses/[id] - Delete expense and its splits
 export async function DELETE(
   request: Request,
@@ -14,7 +12,7 @@ export async function DELETE(
 
   try {
     
-    const db = getSafeDb();
+    const db = await getSafeDb();
 
     await db.transaction(async (tx: any) => {
       await tx.delete(schema.expenseSplits).where(eq(schema.expenseSplits.expenseId, id));

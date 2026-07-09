@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
 
-export const runtime = 'edge';
-
 // GET /api/weather - Fetch real weather or fallback to mock weather
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

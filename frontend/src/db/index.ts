@@ -1,5 +1,5 @@
 import { drizzle as drizzleD1 } from 'drizzle-orm/d1';
-import { drizzle as drizzleLibsql } from 'drizzle-orm/libsql';
+import { drizzle as drizzleLibsql } from 'drizzle-orm/libsql/web';
 import * as schema from './schema';
 
 export function getDb(env?: any) {
@@ -16,17 +16,17 @@ export function getDb(env?: any) {
   return drizzleLibsql(client, { schema }) as any;
 }
 
-export function getSafeDb() {
+export async function getSafeDb() {
   let env: any = null;
   try {
-    // Dynamically require to avoid compilation issues in non-edge routes if any
-    const { getRequestContext } = eval('require')('@cloudflare/next-on-pages');
-    const context = getRequestContext();
+    // Use @opennextjs/cloudflare context (works in Cloudflare Pages edge runtime)
+    const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+    const context = await getCloudflareContext({ async: true });
     if (context && context.env) {
       env = context.env;
     }
   } catch (e) {
-    // Running in standard Node.js Next.js dev server
+    // Running in standard Node.js Next.js dev server - use local SQLite
   }
   return getDb(env);
 }

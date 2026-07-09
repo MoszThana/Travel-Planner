@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
 
-export const runtime = 'edge';
-
 function generateUUID() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -21,7 +19,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const db = getSafeDb();
+    const db = await getSafeDb();
 
     const list = await db.select()
       .from(schema.attachments)
@@ -38,7 +36,7 @@ export async function GET(request: Request) {
 // POST /api/upload - Upload file to R2 or write to local uploads/ folder
 export async function POST(request: Request) {
   try {
-    const db = getSafeDb();
+    const db = await getSafeDb();
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -56,13 +54,13 @@ export async function POST(request: Request) {
     const sanitizedFilename = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
     const storageKey = `${generateUUID()}-${sanitizedFilename}`;
 
-    // 1. Try to fetch R2 bucket binding
+    // 1. Try to fetch R2 bucket binding via OpenNext Cloudflare context
     let bucket: any = null;
     try {
-      const { getRequestContext } = eval('require')('@cloudflare/next-on-pages');
-      const context = getRequestContext();
-      if (context && context.env && context.env.ATTACHMENTS_BUCKET) {
-        bucket = context.env.ATTACHMENTS_BUCKET;
+      const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+      const ctx = await getCloudflareContext({ async: true });
+      if (ctx && ctx.env && ctx.env.ATTACHMENTS_BUCKET) {
+        bucket = ctx.env.ATTACHMENTS_BUCKET;
       }
     } catch (e) {
       // Standard Node.js local dev environment
@@ -116,3 +114,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+

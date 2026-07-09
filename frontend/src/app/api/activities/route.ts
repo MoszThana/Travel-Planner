@@ -2,8 +2,6 @@
 import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 
-export const runtime = 'edge';
-
 function generateUUID() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -15,7 +13,7 @@ function generateUUID() {
 export async function POST(request: Request) {
   try {
     
-    const db = getSafeDb();
+    const db = await getSafeDb();
     const body = await request.json() as any;
     const { dayId, name, time, notes, location, lat, lng, transportType, estCost, actCost, costCategory, order } = body;
     
@@ -47,4 +45,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
 

@@ -1,6 +1,10 @@
 name = "travel-planner-frontend"
 compatibility_date = "2024-11-01"
-pages_build_output_dir = ".next"
+compatibility_flags = ["nodejs_compat"]
+main = ".open-next/worker.js"
+
+[assets]
+directory = ".open-next/assets"
 
 [[d1_databases]]
 binding = "DB"
@@ -11,3 +15,7 @@ migrations_dir = "drizzle/migrations"
 [[r2_buckets]]
 binding = "ATTACHMENTS_BUCKET"
 bucket_name = "travel-planner-attachments"
+
+[alias]
+"@libsql/client/node" = "./src/db/empty-alias.ts"
+"@libsql/isomorphic-ws" = "./src/db/empty-alias.ts"

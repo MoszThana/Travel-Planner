@@ -3,8 +3,6 @@ import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
 
-export const runtime = 'edge';
-
 // PUT /api/activities/[id] - Edit activity
 export async function PUT(
   request: Request,
@@ -14,7 +12,7 @@ export async function PUT(
 
   try {
     
-    const db = getSafeDb();
+    const db = await getSafeDb();
 
     const updates = await request.json() as any;
     await db.update(schema.activities)
@@ -37,7 +35,7 @@ export async function DELETE(
 
   try {
     
-    const db = getSafeDb();
+    const db = await getSafeDb();
 
     await db.delete(schema.activities).where(eq(schema.activities.id, id));
     return NextResponse.json({ success: true });

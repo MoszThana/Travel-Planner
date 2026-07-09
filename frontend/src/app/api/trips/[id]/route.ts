@@ -3,8 +3,6 @@ import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq, inArray } from 'drizzle-orm';
 
-export const runtime = 'edge';
-
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -13,7 +11,7 @@ export async function GET(
 
   try {
     
-    const db = getSafeDb();
+    const db = await getSafeDb();
 
     const tripRows = await db.select().from(schema.trips).where(eq(schema.trips.id, id));
     if (tripRows.length === 0) {

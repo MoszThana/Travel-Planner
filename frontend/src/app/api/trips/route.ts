@@ -3,8 +3,6 @@ import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
 
-export const runtime = 'edge';
-
 function generateUUID() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -16,7 +14,7 @@ function generateUUID() {
 export async function GET() {
   try {
     
-    const db = getSafeDb();
+    const db = await getSafeDb();
     const list = await db.select().from(schema.trips).orderBy(schema.trips.createdAt);
     return NextResponse.json(list);
   } catch (err: any) {
@@ -29,7 +27,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     
-    const db = getSafeDb();
+    const db = await getSafeDb();
     
 
     const body = await request.json() as any;
@@ -96,4 +94,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
 

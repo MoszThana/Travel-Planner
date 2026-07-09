@@ -1,5 +1,3 @@
-import { NextResponse } from 'next/server';
-export const runtime = 'edge';
 
 export async function GET(
   request: Request,
@@ -7,11 +5,11 @@ export async function GET(
 ) {
   const { key } = await params;
 
-  // 1. Try to get R2 bucket binding context from Cloudflare
+  // 1. Try to get R2 bucket binding context from Cloudflare via OpenNext
   let bucket: any = null;
   try {
-    const { getRequestContext } = eval('require')('@cloudflare/next-on-pages');
-    const context = getRequestContext();
+    const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+    const context = await getCloudflareContext({ async: true });
     if (context && context.env && context.env.ATTACHMENTS_BUCKET) {
       bucket = context.env.ATTACHMENTS_BUCKET;
     }

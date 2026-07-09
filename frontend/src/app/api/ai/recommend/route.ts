@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { queryGemini } from '@/utils/aiHelper';
 
-export const runtime = 'edge';
-
 // POST /api/ai/recommend - Nearby recommendations based on active location and weather
 export async function POST(request: Request) {
   try {

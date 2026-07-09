@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { queryGemini } from '@/utils/aiHelper';
 
-export const runtime = 'edge';
-
 // POST /api/ai/predict-cost - Predict cost range of activities
 export async function POST(request: Request) {
   try {
