@@ -35,13 +35,40 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh }) => {
   // Map reference to programmatically pan
   const mapRef = useRef<google.maps.Map | null>(null);
 
+  // Leaflet references and states
+  const [leafletLoaded, setLeafletLoaded] = useState(false);
+  const mapInstanceRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+  const polylineRef = useRef<any>(null);
+
   const activeDay = trip.days && trip.days[activeDayIdx];
   const dayActivities = trip.activities
     ? trip.activities.filter((a: any) => a.dayId === activeDay?.id)
     : [];
 
-  // Filter activities that have valid coordinates
-  const validMapActivities = dayActivities.filter((act: any) => act.lat && act.lng);
+  // Filter activities that have valid coordinates, and assign mock coords if missing so they show on map
+  const getValidMapActivities = () => {
+    const withCoords = dayActivities.filter((act: any) => act.lat && act.lng);
+    const baseCenter = withCoords.length > 0 ? { lat: withCoords[0].lat, lng: withCoords[0].lng } : DEFAULT_CENTER;
+
+    return dayActivities.map((act: any, idx: number) => {
+      if (act.lat && act.lng) {
+        return act;
+      }
+      // Generate clean mock coordinates in sequence around base center
+      const angle = idx * 0.5;
+      const radius = 0.005 + idx * 0.003;
+      const mockLat = baseCenter.lat + Math.sin(angle) * radius;
+      const mockLng = baseCenter.lng + Math.cos(angle) * radius;
+      return {
+        ...act,
+        lat: mockLat,
+        lng: mockLng
+      };
+    });
+  };
+
+  const validMapActivities = getValidMapActivities();
 
   // Initialize Google Maps script loader
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
@@ -69,9 +96,100 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh }) => {
 
   const center = getMapCenter();
 
+  // Load Leaflet CDN script & styles
+  useEffect(() => {
+    if (apiKey) return;
+
+    if ((window as any).L) {
+      setLeafletLoaded(true);
+      return;
+    }
+
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
+
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.onload = () => {
+      setLeafletLoaded(true);
+    };
+    document.head.appendChild(script);
+  }, [apiKey]);
+
+  // Handle Leaflet Map Initialization and updates
+  useEffect(() => {
+    if (!leafletLoaded || apiKey) return;
+    const L = (window as any).L;
+    if (!L) return;
+
+    const container = document.getElementById('leaflet-map-container');
+    if (!container) return;
+
+    // Initialize map if not already done
+    if (!mapInstanceRef.current) {
+      mapInstanceRef.current = L.map('leaflet-map-container').setView([center.lat, center.lng], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(mapInstanceRef.current);
+    } else {
+      mapInstanceRef.current.setView([center.lat, center.lng], 13);
+    }
+
+    const map = mapInstanceRef.current;
+
+    // Clear existing markers
+    markersRef.current.forEach(m => m.remove());
+    markersRef.current = [];
+
+    // Clear existing polyline
+    if (polylineRef.current) {
+      polylineRef.current.remove();
+      polylineRef.current = null;
+    }
+
+    // Add new markers
+    const latlngs: any[] = [];
+    validMapActivities.forEach((act: any, idx: number) => {
+      if (act.lat && act.lng) {
+        const marker = L.marker([act.lat, act.lng], {
+          icon: L.divIcon({
+            className: styles.customLeafletMarker,
+            html: `<div class="${styles.markerLabel}">${idx + 1}</div>`
+          })
+        })
+          .addTo(map)
+          .bindPopup(`<b>${idx + 1}. ${act.name}</b><br/>${act.time || '12:00'}`);
+        markersRef.current.push(marker);
+        latlngs.push([act.lat, act.lng]);
+      }
+    });
+
+    // Add polyline
+    if (latlngs.length > 1) {
+      polylineRef.current = L.polyline(latlngs, { color: '#4f46e5', weight: 4 }).addTo(map);
+    }
+
+    // Fit bounds if markers exist
+    if (latlngs.length > 0) {
+      map.fitBounds(L.latLngBounds(latlngs), { padding: [30, 30] });
+    }
+  }, [leafletLoaded, validMapActivities, apiKey, center.lat, center.lng]);
+
+  // Clean up Leaflet map instance on unmount
+  useEffect(() => {
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, []);
+
   // Generate multi-destination redirect URL to open in external Google Maps app
   const getGoogleMapsDirectionsUrl = () => {
-    if (dayActivities.length === 0) return '';
+    if (validMapActivities.length === 0) return '';
     
     // Fallback coordinates if names are missing
     const getLocStr = (act: any) => {
@@ -80,8 +198,8 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh }) => {
       return '';
     };
 
-    const firstLoc = getLocStr(dayActivities[0]);
-    const lastLoc = getLocStr(dayActivities[dayActivities.length - 1]);
+    const firstLoc = getLocStr(validMapActivities[0]);
+    const lastLoc = getLocStr(validMapActivities[validMapActivities.length - 1]);
 
     if (!firstLoc) return '';
 
@@ -89,8 +207,8 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh }) => {
     const destination = encodeURIComponent(lastLoc || firstLoc);
     
     let waypoints = '';
-    if (dayActivities.length > 2) {
-      const middle = dayActivities.slice(1, -1).filter((act: any) => getLocStr(act));
+    if (validMapActivities.length > 2) {
+      const middle = validMapActivities.slice(1, -1).filter((act: any) => getLocStr(act));
       if (middle.length > 0) {
         waypoints = '&waypoints=' + middle.map((m: any) => encodeURIComponent(getLocStr(m))).join('|');
       }
@@ -221,33 +339,15 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh }) => {
 
   // Center the map on a specific coordinate when clicking the list
   const centerMapOn = (lat: number, lng: number) => {
-    if (mapRef.current) {
+    if (apiKey && mapRef.current) {
       mapRef.current.panTo({ lat, lng });
       mapRef.current.setZoom(15);
+    } else if (mapInstanceRef.current) {
+      mapInstanceRef.current.setView([lat, lng], 15);
     }
   };
 
-  // Build the mock layout fallback if key is missing
-  const activitiesWithMockCoords = dayActivities.map((act: any, idx: number) => {
-    const x = act.lat ? (act.lat * 200) % 300 + 100 : (100 + (idx * 90) % 285);
-    const y = act.lng ? (act.lng * 200) % 200 + 100 : (120 + (idx * 60) % 180);
-    return { ...act, canvasX: x, canvasY: y };
-  });
 
-  const renderSVGPaths = (itemsList: any[], isOptimizedStyle = false) => {
-    if (itemsList.length < 2) return null;
-    let pathD = '';
-    itemsList.forEach((item, idx) => {
-      if (idx === 0) pathD += `M ${item.canvasX} ${item.canvasY}`;
-      else pathD += ` L ${item.canvasX} ${item.canvasY}`;
-    });
-    return (
-      <path
-        d={pathD}
-        className={isOptimizedStyle ? styles.svgPathOptimized : styles.svgPath}
-      />
-    );
-  };
 
   return (
     <div className={styles.container}>
@@ -329,29 +429,12 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh }) => {
               )}
             </GoogleMap>
           ) : (
-            // Fallback Vector map planner
-            <div className={styles.mockMapCanvas}>
-              <div className={styles.mapWarning}>
-                <span>🗺️ Google Maps API Key not loaded. Using vector route mockup.</span>
+            // OpenStreetMap Leaflet container fallback
+            <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+              <div className={styles.mapWarning} style={{ background: 'rgba(16, 185, 129, 0.95)' }}>
+                <span>🗺️ Google Maps API Key not loaded. Using OpenStreetMap fallback.</span>
               </div>
-              <svg className={styles.svgOverlay}>
-                {!showComparison && renderSVGPaths(activitiesWithMockCoords)}
-                {showComparison && renderSVGPaths(activitiesWithMockCoords)}
-                {showComparison && renderSVGPaths(optimizedOrder.map((a, i) => activitiesWithMockCoords.find((node: any) => node.id === a.id)), true)}
-              </svg>
-
-              {activitiesWithMockCoords.map((act: any, idx: number) => (
-                <div
-                  key={act.id}
-                  className={styles.canvasNode}
-                  style={{ left: `${act.canvasX}px`, top: `${act.canvasY}px` }}
-                  title={act.name}
-                >
-                  <div className={styles.nodeLabel}>
-                    {idx + 1}. [{act.time || '12:00'}] {act.name.substring(0, 12)}
-                  </div>
-                </div>
-              ))}
+              <div id="leaflet-map-container" style={{ width: '100%', height: '100%', zIndex: 1 }} />
             </div>
           )}
 
