@@ -40,6 +40,12 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
   const mapRef = React.useRef<any>(null);
   const markerRef = React.useRef<any>(null);
 
+  // Suggestions states and refs
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const skipSearchRef = React.useRef(false);
+
   // AI Alerts & Predictions State
   const [gapAlerts, setGapAlerts] = useState<any[]>([]);
   const [costPredictions, setCostPredictions] = useState<Record<string, any>>({});
@@ -175,6 +181,65 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAddForm, leafletLoaded]);
+
+  // Debounced search trigger for Nominatim suggestions
+  useEffect(() => {
+    if (skipSearchRef.current) {
+      skipSearchRef.current = false;
+      return;
+    }
+
+    if (!location.trim() || location.length < 3) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&limit=5`, {
+          headers: {
+            'User-Agent': 'TravelPlannerAppPrototype/1.0'
+          }
+        });
+        const data = (await res.json()) as any[];
+        setSuggestions(data || []);
+        setShowSuggestions(true);
+      } catch (err) {
+        console.warn("Geocoding suggestions failed", err);
+      } finally {
+        setSearching(false);
+      }
+    }, 600); // 600ms debounce
+
+    return () => clearTimeout(timer);
+  }, [location]);
+
+  const handleSelectSuggestion = (item: any) => {
+    skipSearchRef.current = true;
+    const namePart = item.name || item.display_name.split(',')[0];
+    setLocation(namePart);
+
+    const lat = parseFloat(item.lat);
+    const lng = parseFloat(item.lon);
+    setSelectedLat(lat);
+    setSelectedLng(lng);
+    setShowSuggestions(false);
+
+    // Pan map to selection and update marker
+    if (mapRef.current) {
+      mapRef.current.setView([lat, lng], 14);
+      const L = (window as any).L;
+      if (L) {
+        if (markerRef.current) {
+          markerRef.current.setLatLng([lat, lng]);
+        } else {
+          markerRef.current = L.marker([lat, lng]).addTo(mapRef.current);
+        }
+      }
+    }
+  };
 
   if (!isMounted) return <div style={{ padding: 24, textAlign: 'center' }}>{t('common.loading')}</div>;
 
@@ -745,7 +810,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
                 </div>
               </div>
 
-              <div className={styles.formGroup}>
+              <div className={styles.formGroup} style={{ position: 'relative' }}>
                 <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
                   Location Name
                 </label>
@@ -756,7 +821,60 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
                   placeholder="Address or Google Places Name"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
+                  onFocus={() => {
+                    if (location.trim().length >= 3) {
+                      setShowSuggestions(true);
+                    }
+                  }}
                 />
+
+                {/* Search suggestion indicator */}
+                {searching && (
+                  <div style={{ position: 'absolute', right: '12px', top: '34px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Searching...
+                  </div>
+                )}
+
+                {/* Suggestions Overlay Dropdown */}
+                {showSuggestions && suggestions.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+                    zIndex: 2000,
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    marginTop: '4px'
+                  }}>
+                    {suggestions.map((item, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => handleSelectSuggestion(item)}
+                        style={{
+                          padding: '10px 14px',
+                          borderBottom: idx === suggestions.length - 1 ? 'none' : '1px solid var(--border)',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          color: 'var(--text)',
+                          transition: 'background 0.2s',
+                          background: 'transparent'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--hover)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <strong style={{ color: 'var(--primary)' }}>{item.name || item.display_name.split(',')[0]}</strong>
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {item.display_name}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Pin on Map selection section */}
