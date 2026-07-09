@@ -39,6 +39,18 @@ export async function POST(request: Request) {
 
     const tripId = generateUUID();
 
+    // Ensure the owner user exists in the database to prevent foreign key errors
+    try {
+      await db.insert(schema.users).values({
+        id: ownerId,
+        name: ownerId.replace('user-', ''),
+        email: `${ownerId.replace('user-', '')}@example.com`,
+        createdAt: Date.now()
+      }).onConflictDoNothing();
+    } catch (e) {
+      // Ignore
+    }
+
     // 1. Insert Trip
     await db.insert(schema.trips).values({
       id: tripId,

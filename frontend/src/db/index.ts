@@ -28,7 +28,24 @@ export async function getSafeDb() {
   } catch (e) {
     // Running in standard Node.js Next.js dev server - use local SQLite
   }
-  return getDb(env);
+  const db = getDb(env);
+
+  // Seed mock users to prevent Foreign Key constraint failures during prototype testing
+  try {
+    const mockUsers = [
+      { id: 'user-maru', name: 'Maru', email: 'maru@example.com', avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Maru', createdAt: Date.now() },
+      { id: 'user-somchai', name: 'Somchai', email: 'somchai@example.com', avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Somchai', createdAt: Date.now() },
+      { id: 'user-jane', name: 'Jane', email: 'jane@example.com', avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Jane', createdAt: Date.now() },
+      { id: 'user-david', name: 'David', email: 'david@example.com', avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=David', createdAt: Date.now() },
+    ];
+    for (const u of mockUsers) {
+      await db.insert(schema.users).values(u).onConflictDoNothing();
+    }
+  } catch (err) {
+    // Ignore seeding errors
+  }
+
+  return db;
 }
 
 export * as schema from './schema';
