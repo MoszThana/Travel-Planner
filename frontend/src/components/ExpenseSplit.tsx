@@ -10,9 +10,10 @@ import localStyles from './ExpenseSplit.module.css';
 interface ExpenseSplitProps {
   trip: any;
   onRefresh: () => void;
+  userRole?: string;
 }
 
-export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh }) => {
+export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, userRole = 'editor' }) => {
   const { t } = useTranslation();
   const { user } = useAuth();
 
@@ -258,9 +259,11 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh }) =
     <div className={localStyles.container}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 className={localStyles.title}>{t('group.title')}</h2>
-        <button className={localStyles.approveBtn} style={{ flex: 'unset', padding: '8px 12px' }} onClick={() => setShowAddForm(true)}>
-          + Record Cost
-        </button>
+        {userRole !== 'viewer' && (
+          <button className={localStyles.approveBtn} style={{ flex: 'unset', padding: '8px 12px' }} onClick={() => setShowAddForm(true)}>
+            + Record Cost
+          </button>
+        )}
       </div>
 
       {/* Members Section */}

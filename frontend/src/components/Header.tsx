@@ -7,7 +7,7 @@ import styles from './Header.module.css';
 
 export const Header: React.FC = () => {
   const { locale, setLocale } = useTranslation();
-  const { user, allUsers, setCurrentUserById } = useAuth();
+  const { user, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
 
@@ -26,11 +26,6 @@ export const Header: React.FC = () => {
       };
     }
   }, []);
-
-  const selectUser = (userId: string) => {
-    setCurrentUserById(userId);
-    setDropdownOpen(false);
-  };
 
   return (
     <header className={styles.header}>
@@ -72,19 +67,32 @@ export const Header: React.FC = () => {
             </button>
 
             {dropdownOpen && (
-              <div className={styles.dropdown}>
-                <span className={styles.dropdownTitle}>Test Profile</span>
-                {allUsers.map((u) => (
-                  <button 
-                    key={u.id}
-                    className={`${styles.userOption} ${user.id === u.id ? styles.userOptionActive : ''}`}
-                    onClick={() => selectUser(u.id)}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={u.avatarUrl} alt={u.name} className={styles.smallAvatar} />
-                    <span>{u.name}</span>
-                  </button>
-                ))}
+              <div className={styles.dropdown} style={{ minWidth: '180px', padding: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={user.avatarUrl} alt={user.name} style={{ width: '48px', height: '48px', borderRadius: '50%' }} />
+                  <span style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--text)' }}>{user.name}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{user.email}</span>
+                </div>
+                <button 
+                  className={styles.userOption}
+                  style={{ 
+                    justifyContent: 'center', 
+                    color: '#ef4444', 
+                    border: '1px solid var(--border)', 
+                    borderRadius: '6px', 
+                    padding: '8px', 
+                    width: '100%',
+                    background: 'transparent',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => {
+                    logout();
+                    setDropdownOpen(false);
+                  }}
+                >
+                  🚪 Log Out / Switch Profile
+                </button>
               </div>
             )}
           </div>

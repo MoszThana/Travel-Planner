@@ -10,9 +10,10 @@ import localStyles from './AIDrawer.module.css';
 interface AIDrawerProps {
   trip: any;
   onRefresh: () => void;
+  userRole?: string;
 }
 
-export const AIDrawer: React.FC<AIDrawerProps> = ({ trip, onRefresh }) => {
+export const AIDrawer: React.FC<AIDrawerProps> = ({ trip, onRefresh, userRole = 'editor' }) => {
   const { t } = useTranslation();
   const { user } = useAuth();
 

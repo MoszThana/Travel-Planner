@@ -6,6 +6,7 @@ import styles from './BudgetTracker.module.css';
 
 interface BudgetTrackerProps {
   trip: any;
+  userRole?: string;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -18,7 +19,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   other: '#64748b'      // Gray
 };
 
-export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip }) => {
+export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, userRole = 'editor' }) => {
   const { t } = useTranslation();
   const [targetBudget, setTargetBudget] = useState(50000); // Default target budget
 
@@ -50,7 +51,6 @@ export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip }) => {
     trip.activities.forEach((act: any) => {
       totalEst += act.estCost || 0;
       totalAct += act.actCost || 0;
-
       const cat = act.costCategory || 'other';
       if (cat in categoryTotals) {
         categoryTotals[cat] += act.actCost || act.estCost || 0; // Use actual if spent, else est
@@ -95,6 +95,7 @@ export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip }) => {
           <input
             type="number"
             value={targetBudget}
+            disabled={userRole === 'viewer'}
             onChange={(e) => handleTargetChange(e.target.value)}
             style={{ width: '120px', padding: '6px', border: '1px solid var(--border)', borderRadius: '6px', textAlign: 'right', fontWeight: '700' }}
           />

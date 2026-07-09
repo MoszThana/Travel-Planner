@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiRequest } from '@/utils/api';
 
 export interface UserProfile {
   id: string;
@@ -12,55 +13,72 @@ export interface UserProfile {
 interface AuthContextType {
   user: UserProfile | null;
   allUsers: UserProfile[];
-  login: (username: string) => void;
+  loginWithPin: (userId: string, pin: string) => Promise<{ success: boolean; error?: string }>;
+  createProfile: (name: string, email: string, pin: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
-  setCurrentUserById: (id: string) => void;
+  refreshProfiles: () => Promise<void>;
 }
-
-// Predefined mock users for collaborative group feature testing
-const MOCK_USERS: UserProfile[] = [
-  { id: 'user-maru', name: 'Maru', email: 'maru@example.com', avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Maru' },
-  { id: 'user-somchai', name: 'Somchai', email: 'somchai@example.com', avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Somchai' },
-  { id: 'user-jane', name: 'Jane', email: 'jane@example.com', avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Jane' },
-  { id: 'user-david', name: 'David', email: 'david@example.com', avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=David' },
-];
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+
+  const refreshProfiles = async () => {
+    try {
+      const data = await apiRequest('/users') as UserProfile[];
+      setAllUsers(data || []);
+    } catch (err) {
+      console.error('Failed to load user profiles from backend:', err);
+    }
+  };
 
   useEffect(() => {
+    refreshProfiles();
+
     if (typeof window !== 'undefined') {
       const savedUser = localStorage.getItem('user_profile');
       if (savedUser) {
         setUser(JSON.parse(savedUser));
-      } else {
-        // Default to Maru on first load for easy prototype testing
-        setUser(MOCK_USERS[0]);
-        localStorage.setItem('user_profile', JSON.stringify(MOCK_USERS[0]));
       }
     }
   }, []);
 
-  const login = (username: string) => {
-    const formattedName = username.trim();
-    if (!formattedName) return;
+  const loginWithPin = async (userId: string, pin: string) => {
+    try {
+      const res = await apiRequest('/users/login', {
+        method: 'POST',
+        body: JSON.stringify({ userId, pin })
+      }) as any;
 
-    // Check if user matches any mock users, otherwise create custom
-    const existing = MOCK_USERS.find(u => u.name.toLowerCase() === formattedName.toLowerCase());
-    if (existing) {
-      setUser(existing);
-      localStorage.setItem('user_profile', JSON.stringify(existing));
-    } else {
-      const newUser: UserProfile = {
-        id: `user-${Date.now()}`,
-        name: formattedName,
-        email: `${formattedName.toLowerCase().replace(/\s+/g, '')}@example.com`,
-        avatarUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=${formattedName}`
-      };
-      setUser(newUser);
-      localStorage.setItem('user_profile', JSON.stringify(newUser));
+      if (res && res.success && res.user) {
+        setUser(res.user);
+        localStorage.setItem('user_profile', JSON.stringify(res.user));
+        return { success: true };
+      }
+      return { success: false, error: res?.error || 'Authentication failed' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Incorrect PIN or server error' };
+    }
+  };
+
+  const createProfile = async (name: string, email: string, pin: string) => {
+    try {
+      const res = await apiRequest('/users', {
+        method: 'POST',
+        body: JSON.stringify({ name, email, pin })
+      }) as any;
+
+      if (res && res.success && res.user) {
+        await refreshProfiles();
+        setUser(res.user);
+        localStorage.setItem('user_profile', JSON.stringify(res.user));
+        return { success: true };
+      }
+      return { success: false, error: res?.error || 'Failed to create profile' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Profile creation failed' };
     }
   };
 
@@ -69,16 +87,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('user_profile');
   };
 
-  const setCurrentUserById = (id: string) => {
-    const found = MOCK_USERS.find(u => u.id === id);
-    if (found) {
-      setUser(found);
-      localStorage.setItem('user_profile', JSON.stringify(found));
-    }
-  };
-
   return (
-    <AuthContext.Provider value={{ user, allUsers: MOCK_USERS, login, logout, setCurrentUserById }}>
+    <AuthContext.Provider value={{ user, allUsers, loginWithPin, createProfile, logout, refreshProfiles }}>
       {children}
     </AuthContext.Provider>
   );

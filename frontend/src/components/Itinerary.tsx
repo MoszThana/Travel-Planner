@@ -7,19 +7,22 @@ import { useAuth } from '@/context/AuthContext';
 import { apiRequest } from '@/utils/api';
 import styles from './Itinerary.module.css';
 import { AttachmentsModal } from './AttachmentsModal';
+import { MembersModal } from './MembersModal';
 
 interface ItineraryProps {
   trip: any;
   onBack: () => void;
   onRefresh: () => void;
+  userRole?: string;
 }
 
-export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh }) => {
+export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, userRole = 'editor' }) => {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [activeDayIdx, setActiveDayIdx] = useState(0);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showAttachmentsModal, setShowAttachmentsModal] = useState(false);
+  const [showMembersModal, setShowMembersModal] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [editingActivity, setEditingActivity] = useState<any | null>(null);
 
@@ -514,6 +517,9 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
           ← {t('common.back')}
         </button>
         <span className={styles.tripTitle} style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{trip.name}</span>
+        <button className={styles.addDayBtn} onClick={() => setShowMembersModal(true)} style={{ margin: 0, padding: '6px 12px', fontSize: '13px', width: 'auto', background: 'var(--primary)', color: 'white', border: 'none' }}>
+          👥 Members
+        </button>
         <button className={styles.addDayBtn} onClick={() => setShowAttachmentsModal(true)} style={{ margin: 0, padding: '6px 12px', fontSize: '13px', width: 'auto' }}>
           📎 Files
         </button>
@@ -530,9 +536,11 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
             {t('itinerary.day', { number: d.dayNumber })}
           </button>
         ))}
-        <button className={styles.addDayBtn} onClick={handleAddDay}>
-          + Day
-        </button>
+        {userRole !== 'viewer' && (
+          <button className={styles.addDayBtn} onClick={handleAddDay}>
+            + Day
+          </button>
+        )}
       </div>
 
       {/* AI Schedule Checker Banner */}
@@ -574,7 +582,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
                   const hasRecs = !!recList[act.id];
 
                   return (
-                    <Draggable key={act.id} draggableId={act.id} index={index}>
+                    <Draggable key={act.id} draggableId={act.id} index={index} isDragDisabled={userRole === 'viewer'}>
                       {(dragProvided) => (
                         <div
                           ref={dragProvided.innerRef}
@@ -592,22 +600,24 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
                                   {act.name}
                                 </h4>
                               </div>
-                              <div style={{ display: 'flex', gap: '8px' }}>
-                                <button className={styles.deleteBtn} style={{ color: 'var(--primary)' }} onClick={() => handleEditClick(act)}>
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                    <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4z"></path>
-                                  </svg>
-                                </button>
-                                <button className={styles.deleteBtn} onClick={() => handleDeleteActivity(act.id)}>
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="3 6 5 6 21 6"></polyline>
-                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                    <line x1="10" y1="11" x2="10" y2="17"></line>
-                                    <line x1="14" y1="11" x2="14" y2="17"></line>
-                                  </svg>
-                                </button>
-                              </div>
+                              {userRole !== 'viewer' && (
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <button className={styles.deleteBtn} style={{ color: 'var(--primary)' }} onClick={() => handleEditClick(act)}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                      <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4z"></path>
+                                    </svg>
+                                  </button>
+                                  <button className={styles.deleteBtn} onClick={() => handleDeleteActivity(act.id)}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                      <polyline points="3 6 5 6 21 6"></polyline>
+                                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                      <line x1="10" y1="11" x2="10" y2="17"></line>
+                                      <line x1="14" y1="11" x2="14" y2="17"></line>
+                                    </svg>
+                                  </button>
+                                </div>
+                              )}
                             </div>
 
                             {act.location && (
@@ -657,6 +667,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
                                     type="checkbox"
                                     className={styles.checkbox}
                                     checked={isVisited}
+                                    disabled={userRole === 'viewer'}
                                     onChange={() => handleCheckinToggle(act)}
                                   />
                                   {isVisited ? t('itinerary.visited') : t('itinerary.mark_visited')}
@@ -720,9 +731,11 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
         </Droppable>
       </DragDropContext>
 
-      <button className={styles.addDayBtn} style={{ marginTop: 12, borderStyle: 'solid', background: 'var(--surface)' }} onClick={() => setShowAddForm(true)}>
-        + {t('itinerary.add_activity')}
-      </button>
+      {userRole !== 'viewer' && (
+        <button className={styles.addDayBtn} style={{ marginTop: 12, borderStyle: 'solid', background: 'var(--surface)' }} onClick={() => setShowAddForm(true)}>
+          + {t('itinerary.add_activity')}
+        </button>
+      )}
 
       {/* Add/Edit Activity Modal Sheet */}
       {showAddForm && (
@@ -919,6 +932,15 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
         tripId={trip.id} 
         isOpen={showAttachmentsModal} 
         onClose={() => setShowAttachmentsModal(false)} 
+      />
+
+      <MembersModal
+        tripId={trip.id}
+        isOpen={showMembersModal}
+        onClose={() => setShowMembersModal(false)}
+        members={trip.members || []}
+        userRole={userRole}
+        onRefresh={onRefresh}
       />
     </div>
   );

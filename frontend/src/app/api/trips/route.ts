@@ -10,12 +10,34 @@ function generateUUID() {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
-// GET /api/trips - List all trips
-export async function GET() {
+// GET /api/trips - List trips for a user (or all trips if no userId provided)
+export async function GET(request: Request) {
   try {
-    
     const db = await getSafeDb();
-    const list = await db.select().from(schema.trips).orderBy(schema.trips.createdAt);
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+
+    let list;
+    if (userId) {
+      const rows = await db.select({
+        id: schema.trips.id,
+        name: schema.trips.name,
+        destination: schema.trips.destination,
+        startDate: schema.trips.startDate,
+        endDate: schema.trips.endDate,
+        ownerId: schema.trips.ownerId,
+        createdAt: schema.trips.createdAt,
+        role: schema.tripMembers.role
+      })
+        .from(schema.trips)
+        .innerJoin(schema.tripMembers, eq(schema.trips.id, schema.tripMembers.tripId))
+        .where(eq(schema.tripMembers.userId, userId))
+        .orderBy(schema.trips.createdAt);
+      
+      list = rows;
+    } else {
+      list = await db.select().from(schema.trips).orderBy(schema.trips.createdAt);
+    }
     return NextResponse.json(list);
   } catch (err: any) {
     console.error('Error fetching trips:', err);
@@ -71,17 +93,7 @@ export async function POST(request: Request) {
       joinedAt: Date.now()
     });
 
-    // Seed remaining mock users as members for the prototype
-    const otherUsers = ['user-somchai', 'user-jane', 'user-david'].filter(uid => uid !== ownerId);
-    for (const uid of otherUsers) {
-      await db.insert(schema.tripMembers).values({
-        id: generateUUID(),
-        tripId,
-        userId: uid,
-        role: 'editor',
-        joinedAt: Date.now()
-      });
-    }
+
 
     // 3. Generate Day slots based on date range
     const start = new Date(Number(startDate));

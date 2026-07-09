@@ -9,6 +9,7 @@ import styles from './MapPlanner.module.css';
 interface MapPlannerProps {
   trip: any;
   onRefresh: () => void;
+  userRole?: string;
 }
 
 const mapContainerStyle = {
@@ -22,7 +23,7 @@ const DEFAULT_CENTER = {
   lng: 100.5018
 };
 
-export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh }) => {
+export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRole = 'editor' }) => {
   const { t } = useTranslation();
   const [activeDayIdx, setActiveDayIdx] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
@@ -439,20 +440,22 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh }) => {
           )}
 
           {/* Floating actions search and optimize */}
-          <div className={styles.searchContainer}>
-            <form onSubmit={handleSearch} style={{ display: 'flex', flex: 1, gap: '8px' }}>
-              <input
-                type="text"
-                className={styles.searchInput}
-                placeholder={t('map_planner.search_placeholder')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </form>
-            <button className={styles.optimizeBtn} disabled={isOptimizing} onClick={handleOptimizeClick}>
-              {isOptimizing ? '...' : '✨ Optimize'}
-            </button>
-          </div>
+          {userRole !== 'viewer' && (
+            <div className={styles.searchContainer}>
+              <form onSubmit={handleSearch} style={{ display: 'flex', flex: 1, gap: '8px' }}>
+                <input
+                  type="text"
+                  className={styles.searchInput}
+                  placeholder={t('map_planner.search_placeholder')}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </form>
+              <button className={styles.optimizeBtn} disabled={isOptimizing} onClick={handleOptimizeClick}>
+                {isOptimizing ? '...' : '✨ Optimize'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Directions Redirect URL & Sidebar items with scheduled times */}

@@ -6,6 +6,7 @@ export const users = sqliteTable('users', {
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
   avatarUrl: text('avatar_url'),
+  pin: text('pin'), // 4-digit pin password
   createdAt: integer('created_at').notNull(),
 });
 

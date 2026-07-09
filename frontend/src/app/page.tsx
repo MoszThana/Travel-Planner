@@ -9,9 +9,12 @@ import { MapPlanner } from '@/components/MapPlanner';
 import { BudgetTracker } from '@/components/BudgetTracker';
 import { ExpenseSplit } from '@/components/ExpenseSplit';
 import { AIDrawer } from '@/components/AIDrawer';
+import { useAuth } from '@/context/AuthContext';
+import { LoginView } from '@/components/LoginView';
 import { apiRequest, getOfflineTrips, saveOfflineTrips } from '@/utils/api';
 
 export default function Home() {
+  const { user } = useAuth();
   const [trips, setTrips] = useState<any[]>([]);
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('home');
@@ -20,8 +23,9 @@ export default function Home() {
 
   // Fetch all trips list
   const loadTrips = useCallback(async () => {
+    if (!user) return;
     try {
-      const data = await apiRequest('/trips') as any[];
+      const data = await apiRequest(`/trips?userId=${user.id}`) as any[];
       setTrips(data);
       // Sync offline cache
       saveOfflineTrips(data);
@@ -31,7 +35,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   // Fetch specific trip full details (days, activities, budgets, splits)
   const loadTripDetails = useCallback(async (tripId: string) => {
@@ -86,6 +90,9 @@ export default function Home() {
       return <div style={{ padding: 32, textAlign: 'center' }}>Loading Trip Details...</div>;
     }
 
+    const activeUserMember = activeTripDetails?.members?.find((m: any) => m.id === user?.id);
+    const userRole = activeUserMember?.role || (activeTripDetails?.ownerId === user?.id ? 'owner' : 'viewer');
+
     switch (activeTab) {
       case 'home':
         return (
@@ -93,6 +100,7 @@ export default function Home() {
             trip={activeTripDetails}
             onBack={handleBackToDashboard}
             onRefresh={handleRefresh}
+            userRole={userRole}
           />
         );
       case 'map':
@@ -100,12 +108,14 @@ export default function Home() {
           <MapPlanner
             trip={activeTripDetails}
             onRefresh={handleRefresh}
+            userRole={userRole}
           />
         );
       case 'budget':
         return (
           <BudgetTracker
             trip={activeTripDetails}
+            userRole={userRole}
           />
         );
       case 'group':
@@ -113,6 +123,7 @@ export default function Home() {
           <ExpenseSplit
             trip={activeTripDetails}
             onRefresh={handleRefresh}
+            userRole={userRole}
           />
         );
       case 'ai':
@@ -120,12 +131,17 @@ export default function Home() {
           <AIDrawer
             trip={activeTripDetails}
             onRefresh={handleRefresh}
+            userRole={userRole}
           />
         );
       default:
         return null;
     }
   };
+
+  if (!user) {
+    return <LoginView />;
+  }
 
   return (
     <>
