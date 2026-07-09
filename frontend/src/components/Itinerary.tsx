@@ -33,6 +33,13 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
   const [costCategory, setCostCategory] = useState('other');
   const [saving, setSaving] = useState(false);
 
+  // Leaflet map select states and refs
+  const [selectedLat, setSelectedLat] = useState<number | null>(null);
+  const [selectedLng, setSelectedLng] = useState<number | null>(null);
+  const [leafletLoaded, setLeafletLoaded] = useState(false);
+  const mapRef = React.useRef<any>(null);
+  const markerRef = React.useRef<any>(null);
+
   // AI Alerts & Predictions State
   const [gapAlerts, setGapAlerts] = useState<any[]>([]);
   const [costPredictions, setCostPredictions] = useState<Record<string, any>>({});
@@ -70,6 +77,105 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDayIdx, trip.activities]);
 
+  // Load Leaflet CDN script & styles when form is shown
+  useEffect(() => {
+    if (!showAddForm) return;
+
+    if ((window as any).L) {
+      setLeafletLoaded(true);
+      return;
+    }
+
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
+
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.onload = () => {
+      setLeafletLoaded(true);
+    };
+    document.head.appendChild(script);
+  }, [showAddForm]);
+
+  // Initialize and update selection Leaflet map
+  useEffect(() => {
+    if (!showAddForm || !leafletLoaded) return;
+    const L = (window as any).L;
+    if (!L) return;
+
+    // Use existing coordinates, or fall back to Bangkok center
+    const initialLat = selectedLat || 13.7563;
+    const initialLng = selectedLng || 100.5018;
+
+    const mapContainer = document.getElementById('select-map-container');
+    if (!mapContainer) return;
+
+    // Destroy old instance if exists
+    if (mapRef.current) {
+      mapRef.current.remove();
+      mapRef.current = null;
+      markerRef.current = null;
+    }
+
+    // Initialize Map
+    const map = L.map('select-map-container').setView([initialLat, initialLng], 12);
+    mapRef.current = map;
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Place initial marker if coordinates exist
+    if (selectedLat && selectedLng) {
+      markerRef.current = L.marker([selectedLat, selectedLng]).addTo(map);
+    }
+
+    // Handle map click
+    map.on('click', async (e: any) => {
+      const { lat, lng } = e.latlng;
+      
+      // Update coordinates state
+      setSelectedLat(lat);
+      setSelectedLng(lng);
+
+      // Move/Add marker
+      if (markerRef.current) {
+        markerRef.current.setLatLng(e.latlng);
+      } else {
+        markerRef.current = L.marker(e.latlng).addTo(map);
+      }
+
+      // Reverse geocode to find location name using free Nominatim API
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
+          headers: {
+            'User-Agent': 'TravelPlannerAppPrototype/1.0'
+          }
+        });
+        const data = (await res.json()) as any;
+        if (data && data.display_name) {
+          // Fill in Location Name input with fetched address details
+          const namePart = data.name || data.address.road || data.address.suburb || data.address.city || "Selected Location";
+          setLocation(namePart);
+        }
+      } catch (err) {
+        console.warn("Reverse geocoding failed", err);
+      }
+    });
+
+    // Clean up on unmount or form toggle
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAddForm, leafletLoaded]);
+
   if (!isMounted) return <div style={{ padding: 24, textAlign: 'center' }}>{t('common.loading')}</div>;
 
   const handleEditClick = (act: any) => {
@@ -81,6 +187,8 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
     setTransportType(act.transportType || 'walk');
     setEstCost(String(act.estCost || 0));
     setCostCategory(act.costCategory || 'other');
+    setSelectedLat(act.lat ? parseFloat(act.lat) : null);
+    setSelectedLng(act.lng ? parseFloat(act.lng) : null);
     setShowAddForm(true);
   };
 
@@ -93,6 +201,8 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
     setEstCost('0');
     setCostCategory('other');
     setTransportType('walk');
+    setSelectedLat(null);
+    setSelectedLng(null);
     setShowAddForm(false);
   };
 
@@ -155,6 +265,8 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
       time,
       notes,
       location,
+      lat: selectedLat,
+      lng: selectedLng,
       transportType,
       estCost: parseFloat(estCost) || 0,
       costCategory,
@@ -645,6 +757,19 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh })
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                 />
+              </div>
+
+              {/* Pin on Map selection section */}
+              <div className={styles.formGroup}>
+                <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>📍 Pin on Map (Tap map to select location)</span>
+                  {selectedLat && (
+                    <span style={{ fontSize: '10px', color: 'var(--primary)', fontWeight: 'bold' }}>
+                      ({selectedLat.toFixed(4)}, {selectedLng?.toFixed(4)})
+                    </span>
+                  )}
+                </label>
+                <div id="select-map-container" style={{ width: '100%', height: '180px', borderRadius: '8px', border: '1px solid var(--border)', overflow: 'hidden', marginTop: '4px', zIndex: 1 }} />
               </div>
 
               <div className={styles.formGroup}>
