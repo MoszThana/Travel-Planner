@@ -178,7 +178,8 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
 
     // Add polyline
     if (latlngs.length > 1) {
-      polylineRef.current = L.polyline(latlngs, { color: getRouteColor(), weight: 3, opacity: 0.9 }).addTo(map);
+      // Dashed: this connects stops in a straight line, it is not the real road/transit route
+      polylineRef.current = L.polyline(latlngs, { color: getRouteColor(), weight: 2.5, opacity: 0.8, dashArray: '6 8' }).addTo(map);
     }
 
     // Fit bounds if markers exist
@@ -390,15 +391,28 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
               <Polyline
                 path={validMapActivities.map((a: any) => ({ lat: a.lat, lng: a.lng }))}
                 options={{
+                  // Dashed straight line (Google draws dashes as repeated line symbols)
                   strokeColor: getRouteColor(),
-                  strokeOpacity: 0.9,
-                  strokeWeight: 3
+                  strokeOpacity: 0,
+                  icons: [{
+                    icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.8, strokeWeight: 2.5, scale: 3 },
+                    offset: '0',
+                    repeat: '14px'
+                  }]
                 }}
               />
             )}
           </GoogleMap>
         ) : (
           <div id="leaflet-map-container" className={styles.leafletContainer} />
+        )}
+
+        {/* Explain that the overview line is not the real route */}
+        {!showComparison && validMapActivities.length > 1 && (
+          <div className={styles.lineNote}>
+            <span className={styles.lineSample} />
+            Straight-line view · tap a stop below for the real route
+          </div>
         )}
 
         {/* Route optimisation comparison */}

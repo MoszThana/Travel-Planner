@@ -86,6 +86,33 @@
 .optimizeBtn:active { transform: scale(0.97); }
 .optimizeBtn:disabled { opacity: 0.6; cursor: progress; }
 
+/* Note explaining the dashed overview line */
+.lineNote {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  max-width: calc(100% - 24px);
+  z-index: 1001;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.lineSample {
+  flex-shrink: 0;
+  width: 22px;
+  border-top: 2.5px dashed var(--primary);
+}
+
 /* Route comparison card */
 .routeCard {
   position: absolute;
