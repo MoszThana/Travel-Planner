@@ -10,13 +10,13 @@ interface BudgetTrackerProps {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  food: '#f97316',      // Orange
-  transport: '#3b82f6', // Blue
-  hotel: '#a855f7',     // Purple
-  activity: '#10b981',  // Green
-  shopping: '#ec4899',  // Pink
-  emergency: '#f43f5e', // Red
-  other: '#64748b'      // Gray
+  food: 'var(--cat-food)',
+  transport: 'var(--cat-transport)',
+  hotel: 'var(--cat-hotel)',
+  activity: 'var(--cat-activity)',
+  shopping: 'var(--cat-shopping)',
+  emergency: 'var(--cat-emergency)',
+  other: 'var(--cat-other)'
 };
 
 export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, userRole = 'editor' }) => {
@@ -85,89 +85,88 @@ export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, userRole = '
   const percent = Math.min((totalAct / targetBudget) * 100, 100);
 
   return (
-    <div className={styles.container}>
-      <h2 className={styles.title}>{t('budget.title')}</h2>
-
-      {/* Target Input Card */}
-      <div className={styles.summaryCard} style={{ padding: '14px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)' }}>Set Target Budget:</span>
-          <input
-            type="number"
-            value={targetBudget}
-            disabled={userRole === 'viewer'}
-            onChange={(e) => handleTargetChange(e.target.value)}
-            style={{ width: '120px', padding: '6px', border: '1px solid var(--border)', borderRadius: '6px', textAlign: 'right', fontWeight: '700' }}
-          />
-        </div>
+    <div className="page">
+      <div className="page-header">
+        <h1 className="page-title">{t('budget.title')}</h1>
       </div>
 
-      {/* Summary Card Details */}
-      <div className={styles.summaryCard}>
+      <div className="split">
+      {/* Summary */}
+      <div className={`card ${styles.summaryCard}`}>
         <div className={styles.gaugeHeader}>
-          <span className={styles.gaugeTitle}>{t('budget.actual_spent')}</span>
-          <span className={styles.gaugeValue}>{totalAct.toLocaleString()} THB</span>
+          <span className="eyebrow">{t('budget.actual_spent')}</span>
+          <span className={styles.gaugeValue}>
+            {totalAct.toLocaleString()}
+            <span className={styles.currency}>THB</span>
+          </span>
         </div>
 
-        {/* Progress Bar comparing actual vs target */}
         <div className={styles.progressBar}>
-          <div 
-            className={`${styles.progressFill} ${isOverBudget ? styles.progressFillAlert : ''}`} 
+          <div
+            className={`${styles.progressFill} ${isOverBudget ? styles.progressFillAlert : ''}`}
             style={{ width: `${percent}%` }}
           />
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>
-          <span>0%</span>
-          <span>Target: {targetBudget.toLocaleString()} THB</span>
+        <div className={styles.targetRow}>
+          <span>{targetBudget > 0 ? Math.round(percent) : 0}% of target</span>
+          <label className={styles.targetField}>
+            Target
+            <input
+              type="number"
+              className="input input-sm tabular"
+              value={targetBudget}
+              disabled={userRole === 'viewer'}
+              onChange={(e) => handleTargetChange(e.target.value)}
+            />
+          </label>
         </div>
 
-        {/* Breakdown Stats */}
         <div className={styles.spentStats}>
           <div className={styles.statItem}>
             <span className={styles.statLabel}>{t('budget.remaining')}</span>
-            <span className={styles.statValue} style={{ color: isOverBudget ? 'var(--accent)' : '#22c55e' }}>
-              {remaining.toLocaleString()} THB
+            <span className={`${styles.statValue} ${isOverBudget ? styles.statNegative : styles.statPositive}`}>
+              {remaining.toLocaleString()}
             </span>
           </div>
           <div className={styles.statItem}>
-            <span className={styles.statLabel}>Est. Planned Budget</span>
-            <span className={styles.statValue}>{totalEst.toLocaleString()} THB</span>
+            <span className={styles.statLabel}>Planned</span>
+            <span className={styles.statValue}>{totalEst.toLocaleString()}</span>
           </div>
           <div className={styles.statItem}>
             <span className={styles.statLabel}>{t('budget.daily_average')}</span>
-            <span className={styles.statValue}>{Math.round(costPerDay).toLocaleString()} THB</span>
+            <span className={styles.statValue}>{Math.round(costPerDay).toLocaleString()}</span>
           </div>
           <div className={styles.statItem}>
             <span className={styles.statLabel}>{t('budget.cost_per_person')}</span>
-            <span className={styles.statValue}>{Math.round(costPerPerson).toLocaleString()} THB</span>
+            <span className={styles.statValue}>{Math.round(costPerPerson).toLocaleString()}</span>
           </div>
         </div>
       </div>
 
-      {/* Category Breakdown Card */}
-      <div className={styles.categoryCard}>
-        <h3 className={styles.categoryTitle}>Spending by Category</h3>
-        
-        <div className={styles.categoryList}>
+      {/* Category Breakdown */}
+      <section className="section">
+        <span className="eyebrow">By category</span>
+        <div className="list">
           {Object.entries(categoryTotals).map(([cat, amount]) => {
             const catPercent = totalAct > 0 ? (amount / totalAct) * 100 : 0;
-            const color = CATEGORY_COLORS[cat] || '#64748b';
+            const color = CATEGORY_COLORS[cat] || CATEGORY_COLORS.other;
 
             return (
-              <div key={cat} className={styles.categoryItem}>
+              <div key={cat} className={`list-row ${styles.categoryItem}`}>
                 <div className={styles.itemLabelRow}>
-                  <div className={styles.catIconName}>
+                  <span className={styles.catIconName}>
                     <span className={styles.colorDot} style={{ backgroundColor: color }} />
-                    <span>{t(`budget.categories.${cat}`)}</span>
-                  </div>
+                    {t(`budget.categories.${cat}`)}
+                  </span>
                   <span className={styles.itemAmount}>
-                    {amount.toLocaleString()} THB ({Math.round(catPercent)}%)
+                    {amount.toLocaleString()}
+                    <span className={styles.itemPercent}>{Math.round(catPercent)}%</span>
                   </span>
                 </div>
                 <div className={styles.catProgress}>
-                  <div 
-                    className={styles.catFill} 
+                  <div
+                    className={styles.catFill}
                     style={{ width: `${catPercent}%`, backgroundColor: color }}
                   />
                 </div>
@@ -175,6 +174,7 @@ export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, userRole = '
             );
           })}
         </div>
+      </section>
       </div>
     </div>
   );

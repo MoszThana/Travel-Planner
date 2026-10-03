@@ -1,6 +1,6 @@
 {
   "common": {
-    "app_title": "Antigravity Travel Planner",
+    "app_title": "Travel Planner",
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete",
@@ -32,7 +32,21 @@
     "create_new_trip": "Create New Trip",
     "no_trips": "No trips planned yet. Let's create one!",
     "days_count": "{count} Days",
-    "starts_on": "Starts: {date}"
+    "starts_on": "Starts: {date}",
+    "greeting": "Hello, {name}",
+    "new_trip": "New trip",
+    "status_upcoming": "In {count} days",
+    "status_tomorrow": "Tomorrow",
+    "status_ongoing": "Ongoing",
+    "status_past": "Past",
+    "hero_before": "Plan your",
+    "hero_highlight": "next journey",
+    "hero_text": "Itineraries, maps, budgets and shared expenses for every trip — plan on desktop, follow along on your phone.",
+    "stat_total": "Total trips",
+    "stat_upcoming": "Upcoming",
+    "stat_days": "Days planned",
+    "stat_next": "Next trip",
+    "status_today": "Today"
   },
   "trip_form": {
     "title": "Plan a New Journey",

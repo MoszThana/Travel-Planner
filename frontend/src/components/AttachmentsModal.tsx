@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { apiRequest } from '@/utils/api';
 import { useAuth } from '@/context/AuthContext';
 import styles from './AttachmentsModal.module.css';
+import { Icon, IconName } from './Icon';
 
 interface Attachment {
   id: string;
@@ -100,97 +101,82 @@ export const AttachmentsModal: React.FC<AttachmentsModalProps> = ({ tripId, isOp
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
   };
 
-  const getFileIcon = (mimeType: string) => {
-    if (!mimeType) return '📄';
-    if (mimeType.startsWith('image/')) return '🖼️';
-    if (mimeType.startsWith('video/')) return '🎥';
-    if (mimeType === 'application/pdf') return '📕';
-    if (mimeType.includes('word') || mimeType.includes('officedocument')) return '📘';
-    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return '📗';
-    return '📄';
+  const getFileIcon = (mimeType: string): IconName => {
+    if (!mimeType) return 'file';
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType.startsWith('video/')) return 'video';
+    return 'fileText';
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <div className={styles.header}>
-          <div className={styles.titleGroup}>
-            <span className={styles.icon}>📁</span>
-            <h3 className={styles.title}>Trip Documents & Files</h3>
-          </div>
-          <button className={styles.closeBtn} onClick={onClose}>&times;</button>
+    <div className="sheet-overlay" onClick={onClose}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-head">
+          <h2 className="sheet-title">Files</h2>
+          <button className="btn-icon" onClick={onClose} aria-label="Close">
+            <Icon name="x" size={18} />
+          </button>
         </div>
 
-        <div className={styles.body}>
-          {errorMsg && (
-            <div className={styles.errorAlert}>
-              <span>❌ {errorMsg}</span>
+        {errorMsg && <div className="form-error">{errorMsg}</div>}
+
+        {/* Upload */}
+        <div className={styles.uploadSection}>
+          <label className={styles.fileLabel}>
+            <input type="file" className={styles.fileInput} onChange={handleFileChange} />
+            <div className={styles.uploadBox}>
+              <Icon name="upload" size={22} className={styles.uploadIcon} />
+              <span className={styles.uploadText}>
+                {selectedFile ? selectedFile.name : 'Choose a ticket, receipt, PDF or photo'}
+              </span>
+              {selectedFile && <span className={styles.fileSize}>{formatBytes(selectedFile.size)}</span>}
             </div>
+          </label>
+
+          {selectedFile && (
+            <button className="btn btn-primary btn-block" onClick={handleUpload} disabled={uploading}>
+              {uploading ? 'Uploading…' : 'Upload'}
+            </button>
           )}
+        </div>
 
-          {/* Upload Form */}
-          <div className={styles.uploadSection}>
-            <label className={styles.fileLabel}>
-              <input type="file" className={styles.fileInput} onChange={handleFileChange} />
-              <div className={styles.uploadBox}>
-                <span>📎 {selectedFile ? selectedFile.name : 'Select PDF, Receipt, Image...'}</span>
-                {selectedFile && <span className={styles.fileSize}>{formatBytes(selectedFile.size)}</span>}
-              </div>
-            </label>
-            
-            {selectedFile && (
-              <button 
-                className={styles.uploadBtn} 
-                onClick={handleUpload}
-                disabled={uploading}
-              >
-                {uploading ? 'Uploading file...' : '📤 Upload File'}
-              </button>
-            )}
-          </div>
-
-          <div className={styles.divider} />
-
-          {/* Files List */}
-          <h4 className={styles.sectionTitle}>Uploaded Files</h4>
+        {/* Files List */}
+        <section className="section">
+          <span className="eyebrow">Uploaded</span>
           {loading ? (
-            <div className={styles.loadingState}>Loading files...</div>
+            <div className="empty">{'Loading files…'}</div>
           ) : attachments.length === 0 ? (
-            <div className={styles.emptyState}>No receipts or vouchers uploaded yet.</div>
+            <div className="empty">
+              <Icon name="paperclip" size={24} />
+              No tickets or receipts yet.
+            </div>
           ) : (
-            <div className={styles.fileList}>
+            <div className="list">
               {attachments.map((file) => (
-                <div key={file.id} className={styles.fileCard}>
-                  <div className={styles.fileIcon}>{getFileIcon(file.mimeType)}</div>
-                  <div className={styles.fileDetails}>
-                    <a 
-                      href={file.fileUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className={styles.fileName}
-                    >
-                      {file.name}
-                    </a>
+                <a
+                  key={file.id}
+                  href={file.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`list-row ${styles.fileRow}`}
+                >
+                  <span className={styles.fileIcon}>
+                    <Icon name={getFileIcon(file.mimeType)} size={18} />
+                  </span>
+                  <span className={styles.fileDetails}>
+                    <span className={styles.fileName}>{file.name}</span>
                     <span className={styles.fileMeta}>
-                      {formatBytes(file.fileSize)} • {new Date(file.createdAt).toLocaleDateString()}
+                      {formatBytes(file.fileSize)} · {new Date(file.createdAt).toLocaleDateString()}
                     </span>
-                  </div>
-                  <a 
-                    href={file.fileUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className={styles.viewLink}
-                    title="View Document"
-                  >
-                    ↗
-                  </a>
-                </div>
+                  </span>
+                  <Icon name="arrowUpRight" size={16} className={styles.viewIcon} />
+                </a>
               ))}
             </div>
           )}
-        </div>
+        </section>
       </div>
     </div>
   );

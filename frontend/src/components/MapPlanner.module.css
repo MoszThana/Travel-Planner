@@ -1,166 +1,64 @@
 .container {
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  height: calc(100vh - var(--nav-height) - 64px);
-  animation: fadeIn 0.25s ease;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.titleRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.title {
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--text);
+  gap: 20px;
 }
 
 .mapWrapper {
-  flex: 1;
   position: relative;
+  height: 56vh;
+  min-height: 320px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: var(--glass-shadow);
-  background: #cbd5e1; /* Gray slate background */
+  background: var(--surface-sunken);
 }
 
-/* Fallback Mock Map styles */
-.mockMapCanvas {
+.leafletContainer {
   width: 100%;
   height: 100%;
-  position: relative;
-  background-color: #e2e8f0;
-  background-image: radial-gradient(#94a3b8 1px, transparent 1px);
-  background-size: 20px 20px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  z-index: 1;
 }
 
-.mapWarning {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  right: 12px;
-  background: rgba(79, 70, 229, 0.9);
-  backdrop-filter: blur(8px);
-  color: white;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 11px;
-  font-weight: 700;
-  z-index: 1001;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.mapWarning a {
-  color: var(--secondary-light);
-  text-decoration: underline;
-}
-
-/* Vector Canvas Node Pins */
-.canvasNode {
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  background-color: var(--primary);
-  border: 3px solid white;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  cursor: pointer;
-  box-shadow: 0 4px 8px rgba(79,70,229,0.3);
-  transition: transform var(--transition-fast), background-color var(--transition-fast);
-  z-index: 5;
-}
-
-.canvasNodeActive {
-  background-color: var(--accent);
-  transform: translate(-50%, -50%) scale(1.4);
-  box-shadow: 0 0 12px var(--accent);
-}
-
-.nodeLabel {
-  position: absolute;
-  top: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 9px;
-  font-weight: 700;
-  white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  color: var(--text);
-  pointer-events: none;
-}
-
-/* SVG Route Lines overlays */
-.svgOverlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.svgPath {
-  stroke: var(--primary-light);
-  stroke-width: 3;
-  stroke-dasharray: 6, 4;
-  fill: none;
-  animation: dash 30s linear infinite;
-}
-
-.svgPathOptimized {
-  stroke: var(--secondary);
-  stroke-width: 3;
-  fill: none;
-}
-
-@keyframes dash {
-  to {
-    stroke-dashoffset: -1000;
-  }
-}
-
-/* Search bar on Map */
+/* Floating search + optimise */
 .searchContainer {
   position: absolute;
-  bottom: 12px;
   left: 12px;
   right: 12px;
-  z-index: 10;
+  bottom: 12px;
+  z-index: 1001;
   display: flex;
   gap: 8px;
 }
 
+.searchForm {
+  position: relative;
+  flex: 1;
+  display: flex;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
 .searchInput {
   flex: 1;
-  background: var(--surface);
+  min-width: 0;
+  height: 44px;
+  padding: 0 14px 0 38px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
+  background: var(--surface);
   color: var(--text);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  font-size: 14px;
+  box-shadow: var(--shadow-md);
+}
+
+.searchInput::placeholder {
+  color: var(--text-faint);
 }
 
 .searchInput:focus {
@@ -169,94 +67,184 @@
 }
 
 .optimizeBtn {
-  background: var(--secondary);
-  color: white;
-  border: none;
-  padding: 10px 16px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.25);
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  transition: background-color var(--transition-fast);
+  height: 44px;
+  padding: 0 16px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: var(--shadow-md);
+  transition: filter var(--transition-fast), transform var(--transition-fast);
 }
 
-.optimizeBtn:active {
-  transform: scale(0.95);
-}
+.optimizeBtn:hover { filter: brightness(1.08); }
+.optimizeBtn:active { transform: scale(0.97); }
+.optimizeBtn:disabled { opacity: 0.6; cursor: progress; }
 
-/* Route Info Card Overlay */
+/* Route comparison card */
 .routeCard {
   position: absolute;
-  top: 60px;
+  top: 12px;
   left: 12px;
   right: 12px;
+  z-index: 1001;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 12px;
-  z-index: 10;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
 .routeText {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
-.optimizeActions {
+.routeDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.routeNote {
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+/* Stops list */
+.stopList {
   display: flex;
   gap: 8px;
-  margin-top: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 calc(var(--gutter) * -1);
+  padding: 2px var(--gutter);
 }
 
-.applyOptBtn {
-  flex: 1;
-  background: var(--secondary);
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
+.stopList::-webkit-scrollbar {
+  display: none;
 }
 
-.rejectOptBtn {
-  background: var(--hover);
-  color: var(--text-muted);
+.stopItem {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 220px;
+  padding: 10px 14px 10px 10px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
+  background: var(--surface);
+  text-align: left;
+  transition: border-color var(--transition-fast);
 }
 
-.customLeafletMarker {
-  background: var(--primary);
-  border: 2px solid white;
+.stopItem:hover:not(:disabled) {
+  border-color: var(--primary-light);
+}
+
+.stopItem:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.stopIndex {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  color: white;
-  width: 24px !important;
-  height: 24px !important;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 12px;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  margin-left: -12px !important;
-  margin-top: -12px !important;
+}
+
+.stopText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.stopTime {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.stopName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stopItemActive,
+.stopItemActive:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+/* Selected stop panel */
+.stopPanel {
+  gap: 14px;
+}
+
+.stopPanelHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stopPanelTitle {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+/* Leaflet numbered markers (class names injected via L.divIcon) */
+.customLeafletMarker {
+  width: 26px !important;
+  height: 26px !important;
+  margin-left: -13px !important;
+  margin-top: -13px !important;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--on-primary);
+  border: 2px solid var(--surface);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .markerLabel {
-  font-size: 11px;
-  font-weight: bold;
-  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* Desktop: taller map, stops wrap instead of scrolling */
+@media (min-width: 900px) {
+  .mapWrapper { height: 64vh; min-height: 460px; }
+  .stopList { flex-wrap: wrap; overflow: visible; margin: 0; padding: 0; }
 }

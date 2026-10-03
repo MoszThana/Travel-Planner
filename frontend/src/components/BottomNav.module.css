@@ -4,95 +4,61 @@
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
-  max-width: 600px; /* Aligns with app-container max-width */
+  max-width: none;
   height: calc(var(--nav-height) + var(--safe-bottom));
-  padding-bottom: var(--safe-bottom);
+  padding: 0 8px var(--safe-bottom);
   display: flex;
   justify-content: space-around;
   align-items: center;
   background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid var(--glass-border);
-  box-shadow: 0 -8px 32px 0 rgba(0, 0, 0, 0.04);
+  backdrop-filter: saturate(140%) blur(12px);
+  -webkit-backdrop-filter: saturate(140%) blur(12px);
+  border-top: 1px solid var(--border);
   z-index: 1000;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
 .navItem {
+  flex: 1;
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  flex: 1;
-  height: 100%;
+  gap: 3px;
   border: none;
   background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: color var(--transition-fast), transform var(--transition-fast);
-  position: relative;
-}
-
-.navItem:active {
-  transform: scale(0.92);
-}
-
-.iconWrapper {
-  width: 24px;
-  height: 24px;
-  margin-bottom: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform var(--transition-normal);
-}
-
-.navItemActive .iconWrapper {
-  transform: translateY(-2px);
-}
-
-.label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  color: var(--text-faint);
   transition: color var(--transition-fast);
 }
 
-/* Active styles */
+.navItem:hover {
+  color: var(--text-muted);
+}
+
+.iconWrapper {
+  width: 48px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-normal);
+}
+
+.label {
+  font-size: 11px;
+  font-weight: 500;
+}
+
 .navItemActive {
+  color: var(--text);
+}
+
+.navItemActive:hover {
+  color: var(--text);
+}
+
+.navItemActive .iconWrapper {
+  background: var(--primary-soft);
   color: var(--primary);
-}
-
-/* Active indicator dot */
-.navItemActive::after {
-  content: '';
-  position: absolute;
-  bottom: 6px;
-  width: 4px;
-  height: 4px;
-  background-color: var(--primary);
-  border-radius: 50%;
-  animation: scaleUp 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-}
-
-@keyframes scaleUp {
-  from {
-    transform: scale(0);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-/* Dark mode adjustments */
-@media (prefers-color-scheme: dark) {
-  .navItemActive {
-    color: var(--primary-light);
-  }
-  .navItemActive::after {
-    background-color: var(--primary-light);
-  }
 }

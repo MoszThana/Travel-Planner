@@ -20,6 +20,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [activeTripDetails, setActiveTripDetails] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tripLoadError, setTripLoadError] = useState(false);
 
   // Fetch all trips list
   const loadTrips = useCallback(async () => {
@@ -39,6 +40,7 @@ export default function Home() {
 
   // Fetch specific trip full details (days, activities, budgets, splits)
   const loadTripDetails = useCallback(async (tripId: string) => {
+    setTripLoadError(false);
     try {
       const data = await apiRequest(`/trips/${tripId}`) as any;
       setActiveTripDetails(data);
@@ -46,8 +48,12 @@ export default function Home() {
       console.warn(`Fetching details for trip ${tripId} failed, loading LocalStorage backup.`);
       const offlineList = getOfflineTrips();
       const found = offlineList.find((t: any) => t.id === tripId);
-      if (found) {
+      // The cached trip list has no days/activities; only use a full offline copy
+      if (found && Array.isArray(found.days) && found.days.length > 0) {
         setActiveTripDetails(found);
+      } else {
+        setActiveTripDetails(null);
+        setTripLoadError(true);
       }
     }
   }, []);
@@ -86,8 +92,21 @@ export default function Home() {
 
   // Render correct active tab viewport
   const renderTabContent = () => {
+    if (tripLoadError) {
+      return (
+        <div className="empty">
+          Couldn&apos;t load this trip. Check your connection and try again.
+          <div className="btn-row">
+            <button className="btn btn-sm" onClick={handleBackToDashboard}>Back</button>
+            <button className="btn btn-sm btn-primary" onClick={() => activeTripId && loadTripDetails(activeTripId)}>
+              Retry
+            </button>
+          </div>
+        </div>
+      );
+    }
     if (!activeTripDetails) {
-      return <div style={{ padding: 32, textAlign: 'center' }}>Loading Trip Details...</div>;
+      return <div className="empty">Loading trip…</div>;
     }
 
     const activeUserMember = activeTripDetails?.members?.find((m: any) => m.id === user?.id);
@@ -145,11 +164,15 @@ export default function Home() {
 
   return (
     <>
-      <Header />
+      <Header
+        activeTab={activeTripId ? activeTab : undefined}
+        onTabChange={setActiveTab}
+        onHome={handleBackToDashboard}
+      />
       
       {loading ? (
-        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-          Loading Travel Planner...
+        <div className="empty">
+          Loading…
         </div>
       ) : activeTripId ? (
         // Trip Planning active view mode

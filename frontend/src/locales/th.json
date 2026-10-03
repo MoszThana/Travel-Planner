@@ -1,6 +1,6 @@
 {
   "common": {
-    "app_title": "Antigravity เครื่องมือวางแผนท่องเที่ยว",
+    "app_title": "เครื่องมือวางแผนท่องเที่ยว",
     "save": "บันทึก",
     "cancel": "ยกเลิก",
     "delete": "ลบ",
@@ -32,7 +32,21 @@
     "create_new_trip": "สร้างทริปใหม่",
     "no_trips": "ยังไม่มีการวางแผนทริป เริ่มสร้างกันเลย!",
     "days_count": "{count} วัน",
-    "starts_on": "เริ่มต้น: {date}"
+    "starts_on": "เริ่มต้น: {date}",
+    "greeting": "สวัสดี {name}",
+    "new_trip": "ทริปใหม่",
+    "status_upcoming": "อีก {count} วัน",
+    "status_tomorrow": "พรุ่งนี้",
+    "status_ongoing": "กำลังเดินทาง",
+    "status_past": "ผ่านไปแล้ว",
+    "hero_before": "วางแผน",
+    "hero_highlight": "ทริปถัดไป",
+    "hero_text": "แผนการเดินทาง แผนที่ งบประมาณ และค่าใช้จ่ายร่วมกันสำหรับทุกทริป วางแผนบนคอมพิวเตอร์ แล้วใช้งานต่อบนมือถือระหว่างเดินทาง",
+    "stat_total": "ทริปทั้งหมด",
+    "stat_upcoming": "กำลังจะถึง",
+    "stat_days": "จำนวนวันที่วางแผน",
+    "stat_next": "ทริปถัดไป",
+    "status_today": "วันนี้"
   },
   "trip_form": {
     "title": "วางแผนการเดินทางใหม่",

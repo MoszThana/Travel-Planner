@@ -5,6 +5,9 @@ import { useTranslation } from '@/context/TranslationContext';
 import { apiRequest } from '@/utils/api';
 import { GoogleMap, Marker, Polyline, useJsApiLoader } from '@react-google-maps/api';
 import styles from './MapPlanner.module.css';
+import { Icon } from './Icon';
+import { GoogleMapEmbed } from './GoogleMapEmbed';
+import { hasPoint, googleDirectionsUrl, googleDayRouteUrl } from '@/utils/maps';
 
 interface MapPlannerProps {
   trip: any;
@@ -21,6 +24,12 @@ const mapContainerStyle = {
 const DEFAULT_CENTER = {
   lat: 13.7563,
   lng: 100.5018
+};
+
+// Route line colour follows the theme accent so it matches light and dark mode
+const getRouteColor = () => {
+  if (typeof window === 'undefined') return '#1f5c4f';
+  return getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#1f5c4f';
 };
 
 export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRole = 'editor' }) => {
@@ -169,7 +178,7 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
 
     // Add polyline
     if (latlngs.length > 1) {
-      polylineRef.current = L.polyline(latlngs, { color: '#4f46e5', weight: 4 }).addTo(map);
+      polylineRef.current = L.polyline(latlngs, { color: getRouteColor(), weight: 3, opacity: 0.9 }).addTo(map);
     }
 
     // Fit bounds if markers exist
@@ -189,34 +198,14 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
   }, []);
 
   // Generate multi-destination redirect URL to open in external Google Maps app
-  const getGoogleMapsDirectionsUrl = () => {
-    if (validMapActivities.length === 0) return '';
-    
-    // Fallback coordinates if names are missing
-    const getLocStr = (act: any) => {
-      if (act.location) return act.location;
-      if (act.lat && act.lng) return `${act.lat},${act.lng}`;
-      return '';
-    };
+  // Whole day as one Google Maps route (official Maps URL, no key needed)
+  const getGoogleMapsDirectionsUrl = () => googleDayRouteUrl(dayActivities);
 
-    const firstLoc = getLocStr(validMapActivities[0]);
-    const lastLoc = getLocStr(validMapActivities[validMapActivities.length - 1]);
-
-    if (!firstLoc) return '';
-
-    const origin = encodeURIComponent(firstLoc);
-    const destination = encodeURIComponent(lastLoc || firstLoc);
-    
-    let waypoints = '';
-    if (validMapActivities.length > 2) {
-      const middle = validMapActivities.slice(1, -1).filter((act: any) => getLocStr(act));
-      if (middle.length > 0) {
-        waypoints = '&waypoints=' + middle.map((m: any) => encodeURIComponent(getLocStr(m))).join('|');
-      }
-    }
-    
-    return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypoints}&travelmode=driving`;
-  };
+  // Stop selected in the list below the map
+  const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
+  const selectedIdx = dayActivities.findIndex((a: any) => a.id === selectedStopId);
+  const selectedStop = selectedIdx >= 0 ? dayActivities[selectedIdx] : null;
+  const selectedStopPrev = selectedIdx > 0 ? dayActivities[selectedIdx - 1] : null;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -351,155 +340,181 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
 
 
   return (
-    <div className={styles.container}>
-      <div className={styles.titleRow}>
-        <h2 className={styles.title}>{t('map_planner.title')}</h2>
-        
-        <select 
-          style={{ padding: '6px 12px', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--surface)', color: 'var(--text)', fontSize: '12px', fontWeight: '700' }}
+    <div className={`page ${styles.container}`}>
+      <div className="page-header">
+        <h1 className="page-title">{t('map_planner.title')}</h1>
+
+        <select
+          className="input input-sm"
+          style={{ width: 'auto' }}
           value={activeDayIdx}
           onChange={(e) => {
             setActiveDayIdx(parseInt(e.target.value));
+            setSelectedStopId(null);
             setShowComparison(false);
           }}
         >
           {trip.days?.map((d: any, idx: number) => (
             <option key={d.id} value={idx}>
-              Day {d.dayNumber}
+              {t('itinerary.day', { number: d.dayNumber })}
             </option>
           ))}
         </select>
       </div>
 
-      {/* Comparison Overlay Panel */}
-      {showComparison && (
-        <div className={styles.routeCard}>
-          <strong style={{ fontSize: '13px', color: 'var(--primary)' }}>🤖 Auto Route Optimization comparison</strong>
-          <span className={styles.routeText}>🔵 Original distance: 15.4 km (~45 mins)</span>
-          <span className={styles.routeText} style={{ color: 'var(--secondary)' }}>🟢 Optimized distance: 11.2 km (~30 mins)</span>
-          <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>We rearranged the sequence to avoid zig-zagging travel paths.</p>
-          <div className={styles.optimizeActions}>
-            <button className={styles.applyOptBtn} onClick={applyOptimization}>
-              {t('map_planner.apply_optimization')}
-            </button>
-            <button className={styles.rejectOptBtn} onClick={() => setShowComparison(false)}>
-              {t('common.cancel')}
-            </button>
-          </div>
-        </div>
-      )}
+      <div className={styles.mapWrapper}>
+        {/* Google Maps when an API key is configured, otherwise OpenStreetMap via Leaflet */}
+        {isLoaded && apiKey ? (
+          <GoogleMap
+            mapContainerStyle={mapContainerStyle}
+            center={center}
+            zoom={13}
+            onLoad={(map) => { mapRef.current = map; }}
+            onUnmount={() => { mapRef.current = null; }}
+          >
+            {validMapActivities.map((act: any, idx: number) => (
+              <Marker
+                key={act.id}
+                position={{ lat: act.lat, lng: act.lng }}
+                label={{
+                  text: `${idx + 1}`,
+                  color: 'white',
+                  fontWeight: '600',
+                  fontSize: '11px'
+                }}
+                title={`${act.time || '12:00'} · ${act.name}`}
+              />
+            ))}
 
-      {/* Map & Sidebar Split Layout */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
-        <div className={styles.mapWrapper}>
-          
-          {/* If API Key loaded, render Google Maps. Otherwise, fallback to vector graphics planner */}
-          {isLoaded && apiKey ? (
-            <GoogleMap
-              mapContainerStyle={mapContainerStyle}
-              center={center}
-              zoom={13}
-              onLoad={(map) => { mapRef.current = map; }}
-              onUnmount={() => { mapRef.current = null; }}
-            >
-              {/* Display markers on map */}
-              {validMapActivities.map((act: any, idx: number) => (
-                <Marker
-                  key={act.id}
-                  position={{ lat: act.lat, lng: act.lng }}
-                  label={{
-                    text: `${idx + 1}. [${act.time || '12:00'}]`,
-                    color: 'white',
-                    fontWeight: 'bold',
-                    fontSize: '11px'
-                  }}
-                  title={act.name}
-                />
-              ))}
+            {validMapActivities.length > 1 && (
+              <Polyline
+                path={validMapActivities.map((a: any) => ({ lat: a.lat, lng: a.lng }))}
+                options={{
+                  strokeColor: getRouteColor(),
+                  strokeOpacity: 0.9,
+                  strokeWeight: 3
+                }}
+              />
+            )}
+          </GoogleMap>
+        ) : (
+          <div id="leaflet-map-container" className={styles.leafletContainer} />
+        )}
 
-              {/* Display Polyline Route */}
-              {validMapActivities.length > 1 && (
-                <Polyline
-                  path={validMapActivities.map((a: any) => ({ lat: a.lat, lng: a.lng }))}
-                  options={{
-                    strokeColor: '#4f46e5',
-                    strokeOpacity: 0.8,
-                    strokeWeight: 4
-                  }}
-                />
-              )}
-            </GoogleMap>
-          ) : (
-            // OpenStreetMap Leaflet container fallback
-            <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-              <div className={styles.mapWarning} style={{ background: 'rgba(16, 185, 129, 0.95)' }}>
-                <span>🗺️ Google Maps API Key not loaded. Using OpenStreetMap fallback.</span>
-              </div>
-              <div id="leaflet-map-container" style={{ width: '100%', height: '100%', zIndex: 1 }} />
-            </div>
-          )}
-
-          {/* Floating actions search and optimize */}
-          {userRole !== 'viewer' && (
-            <div className={styles.searchContainer}>
-              <form onSubmit={handleSearch} style={{ display: 'flex', flex: 1, gap: '8px' }}>
-                <input
-                  type="text"
-                  className={styles.searchInput}
-                  placeholder={t('map_planner.search_placeholder')}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </form>
-              <button className={styles.optimizeBtn} disabled={isOptimizing} onClick={handleOptimizeClick}>
-                {isOptimizing ? '...' : '✨ Optimize'}
+        {/* Route optimisation comparison */}
+        {showComparison && (
+          <div className={styles.routeCard}>
+            <span className="eyebrow">Route optimisation</span>
+            <span className={styles.routeText}>
+              <span className={styles.routeDot} style={{ background: 'var(--text-faint)' }} />
+              Original · 15.4 km (~45 min)
+            </span>
+            <span className={styles.routeText}>
+              <span className={styles.routeDot} style={{ background: 'var(--primary)' }} />
+              Optimised · 11.2 km (~30 min)
+            </span>
+            <p className={styles.routeNote}>Stops reordered to avoid zig-zagging between places.</p>
+            <div className="btn-row">
+              <button className="btn btn-sm" onClick={() => setShowComparison(false)}>
+                {t('common.cancel')}
+              </button>
+              <button className="btn btn-sm btn-primary" onClick={applyOptimization}>
+                {t('map_planner.apply_optimization')}
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Directions Redirect URL & Sidebar items with scheduled times */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {dayActivities.length > 0 && getGoogleMapsDirectionsUrl() && (
+        {/* Floating search and optimise */}
+        {userRole !== 'viewer' && (
+          <div className={styles.searchContainer}>
+            <form onSubmit={handleSearch} className={styles.searchForm}>
+              <Icon name="search" size={16} className={styles.searchIcon} />
+              <input
+                type="text"
+                className={styles.searchInput}
+                placeholder={t('map_planner.search_placeholder')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </form>
+            <button className={styles.optimizeBtn} disabled={isOptimizing} onClick={handleOptimizeClick}>
+              <Icon name="sparkles" size={15} />
+              {isOptimizing ? t('common.loading') : 'Optimise'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Stops for the selected day */}
+      <section className="section">
+        <div className="section-head">
+          <span className="eyebrow">Stops · tap one for directions</span>
+          {getGoogleMapsDirectionsUrl() && (
             <a
               href={getGoogleMapsDirectionsUrl()}
               target="_blank"
               rel="noopener noreferrer"
-              className={styles.optimizeBtn}
-              style={{ justifyContent: 'center', background: 'var(--primary)', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)' }}
+              className="btn btn-sm"
             >
-              🗺️ Open Route in Google Maps App
+              <Icon name="route" size={15} />
+              Full day in Google Maps
             </a>
           )}
-
-          {/* Locations list show scheduled times */}
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>📍 DAY PLANS (Tap to focus map)</span>
-            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '2px 0' }}>
-              {dayActivities.map((act: any, idx: number) => (
-                <button
-                  key={act.id}
-                  onClick={() => act.lat && act.lng && centerMapOn(act.lat, act.lng)}
-                  style={{
-                    flexShrink: 0,
-                    background: 'var(--background)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    padding: '8px 12px',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    color: 'var(--text)',
-                    fontSize: '12px'
-                  }}
-                >
-                  <strong style={{ color: 'var(--primary)' }}>[{act.time || '12:00'}]</strong>
-                  <div style={{ fontWeight: '700', marginTop: '2px' }}>{idx + 1}. {act.name.substring(0, 16)}</div>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
-      </div>
+        {dayActivities.length === 0 ? (
+          <div className="empty">{t('itinerary.no_activities')}</div>
+        ) : (
+          <div className={styles.stopList}>
+            {dayActivities.map((act: any, idx: number) => (
+              <button
+                key={act.id}
+                className={`${styles.stopItem} ${selectedStop?.id === act.id ? styles.stopItemActive : ''}`}
+                onClick={() => {
+                  setSelectedStopId(act.id);
+                  if (act.lat && act.lng) centerMapOn(act.lat, act.lng);
+                }}
+                disabled={!hasPoint(act)}
+              >
+                <span className={styles.stopIndex}>{idx + 1}</span>
+                <span className={styles.stopText}>
+                  <span className={styles.stopTime}>{act.time || '12:00'}</span>
+                  <span className={styles.stopName}>{act.name}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Selected stop: real Google map + hand-off to the Google Maps app */}
+        {selectedStop && (
+          <div className={`card ${styles.stopPanel}`}>
+            <div className={styles.stopPanelHead}>
+              <div className={styles.stopText}>
+                <span className={styles.stopTime}>{selectedStop.time || '12:00'}</span>
+                <span className={styles.stopPanelTitle}>{selectedStop.name}</span>
+                {selectedStop.location && <span className={styles.stopTime}>{selectedStop.location}</span>}
+              </div>
+              <a
+                href={googleDirectionsUrl(selectedStop, { transportType: selectedStop.transportType })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-sm btn-primary"
+              >
+                <Icon name="route" size={15} />
+                Navigate
+              </a>
+            </div>
+            <GoogleMapEmbed
+              key={selectedStop.id}
+              place={selectedStop}
+              from={selectedStopPrev}
+              transportType={selectedStop.transportType}
+              height={300}
+            />
+          </div>
+        )}
+      </section>
     </div>
   );
 };

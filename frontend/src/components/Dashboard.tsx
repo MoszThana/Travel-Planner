@@ -5,6 +5,7 @@ import { useTranslation } from '@/context/TranslationContext';
 import { useAuth } from '@/context/AuthContext';
 import { apiRequest } from '@/utils/api';
 import styles from './Dashboard.module.css';
+import { Icon } from './Icon';
 
 interface DashboardProps {
   trips: any[];
@@ -13,7 +14,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ trips, onTripSelect, onRefresh }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { user } = useAuth();
   
   const [showForm, setShowForm] = useState(false);
@@ -106,121 +107,193 @@ export const Dashboard: React.FC<DashboardProps> = ({ trips, onTripSelect, onRef
     onRefresh();
   };
 
-  const formatDate = (ms: number) => {
-    return new Date(ms).toLocaleDateString(undefined, {
+  const formatDate = (ms: number, withYear = false) => {
+    return new Date(ms).toLocaleDateString(locale === 'th' ? 'th-TH' : 'en-GB', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      ...(withYear ? { year: 'numeric' } : {})
     });
   };
 
+  const DAY_MS = 86400000;
+  const startOfDay = (ms: number) => {
+    const d = new Date(ms);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  };
+
+  const getStatus = (trip: any): { label: string; tone: string } => {
+    const today = startOfDay(Date.now());
+    const start = startOfDay(trip.startDate);
+    const end = startOfDay(trip.endDate);
+    if (today < start) {
+      const count = Math.round((start - today) / DAY_MS);
+      return {
+        label: count === 1 ? t('dashboard.status_tomorrow') : t('dashboard.status_upcoming', { count }),
+        tone: 'status-accent'
+      };
+    }
+    if (today <= end) return { label: t('dashboard.status_ongoing'), tone: 'status-success' };
+    return { label: t('dashboard.status_past'), tone: '' };
+  };
+
+  // Hero statistics
+  const today = startOfDay(Date.now());
+  const upcomingTrips = trips
+    .filter((tr) => startOfDay(tr.startDate) >= today)
+    .sort((a, b) => a.startDate - b.startDate);
+  const totalDays = trips.reduce(
+    (sum, tr) => sum + Math.max(1, Math.round((startOfDay(tr.endDate) - startOfDay(tr.startDate)) / DAY_MS) + 1),
+    0
+  );
+  const nextTrip = upcomingTrips[0];
+  const daysToNext = nextTrip ? Math.round((startOfDay(nextTrip.startDate) - today) / DAY_MS) : null;
+
   return (
-    <div className={styles.container}>
-      <div className={styles.titleSection}>
-        <h2 className={styles.title}>{t('dashboard.my_trips')}</h2>
+    <div className="page">
+      {/* Hero banner */}
+      <section className="hero">
+        <div>
+          {user && <span className="hero-stat-label">{t('dashboard.greeting', { name: user.name })}</span>}
+          <h1 className="hero-title" style={{ marginTop: 8 }}>
+            {t('dashboard.hero_before')} <span className="hero-highlight">{t('dashboard.hero_highlight')}</span>
+          </h1>
+          <p className="hero-text">{t('dashboard.hero_text')}</p>
+        </div>
+
+        <div className="hero-stats">
+          <div className="hero-stat">
+            <span className="hero-stat-label">{t('dashboard.stat_total')}</span>
+            <span className="hero-stat-value">{trips.length}</span>
+          </div>
+          <div className="hero-stat">
+            <span className="hero-stat-label">{t('dashboard.stat_upcoming')}</span>
+            <span className="hero-stat-value highlight">{upcomingTrips.length}</span>
+          </div>
+          <div className="hero-stat">
+            <span className="hero-stat-label">{t('dashboard.stat_days')}</span>
+            <span className="hero-stat-value">{totalDays}</span>
+          </div>
+          <div className="hero-stat">
+            <span className="hero-stat-label">{t('dashboard.stat_next')}</span>
+            <span className="hero-stat-value">
+              {daysToNext === null ? '—' : daysToNext === 0 ? t('dashboard.status_today') : daysToNext === 1 ? t('dashboard.status_tomorrow') : t('dashboard.status_upcoming', { count: daysToNext })}
+            </span>
+            {nextTrip && <span className="hero-stat-sub">{nextTrip.name}</span>}
+          </div>
+        </div>
+      </section>
+
+      <div className="page-header">
+        <h2 className="section-title">{t('dashboard.my_trips')}</h2>
         {!showForm && (
-          <button className={styles.createBtn} onClick={() => setShowForm(true)}>
-            + {t('dashboard.create_new_trip')}
+          <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
+            <Icon name="plus" size={16} />
+            {t('dashboard.new_trip')}
           </button>
         )}
       </div>
 
       {showForm ? (
-        <form onSubmit={handleSubmit} className={styles.formCard}>
-          <h3 className={styles.formTitle}>{t('trip_form.title')}</h3>
-          
-          <div className={styles.formGroup}>
-            <label className={styles.label}>{t('trip_form.trip_name')}</label>
+        <form onSubmit={handleSubmit} className={`card form ${styles.formCard}`}>
+          <h2 className="sheet-title">{t('trip_form.title')}</h2>
+
+          <div className="field">
+            <label className="label">{t('trip_form.trip_name')}</label>
             <input
               type="text"
               required
-              className={styles.input}
+              className="input"
               placeholder={t('trip_form.trip_name_placeholder')}
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
 
-          <div className={styles.formGroup}>
-            <label className={styles.label}>{t('trip_form.destination')}</label>
+          <div className="field">
+            <label className="label">{t('trip_form.destination')}</label>
             <input
               type="text"
               required
-              className={styles.input}
+              className="input"
               placeholder={t('trip_form.destination_placeholder')}
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
             />
           </div>
 
-          <div className={styles.row}>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>{t('trip_form.start_date')}</label>
+          <div className="field-row">
+            <div className="field">
+              <label className="label">{t('trip_form.start_date')}</label>
               <input
                 type="date"
                 required
-                className={styles.input}
+                className="input"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
               />
             </div>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>{t('trip_form.end_date')}</label>
+            <div className="field">
+              <label className="label">{t('trip_form.end_date')}</label>
               <input
                 type="date"
                 required
-                className={styles.input}
+                className="input"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
               />
             </div>
           </div>
 
-          <div className={styles.buttonGroup}>
-            <button type="submit" disabled={loading} className={styles.submitBtn}>
-              {loading ? t('common.loading') : t('trip_form.submit')}
-            </button>
-            <button type="button" className={styles.cancelBtn} onClick={() => setShowForm(false)}>
+          <div className="btn-row">
+            <button type="button" className="btn" onClick={() => setShowForm(false)}>
               {t('common.cancel')}
+            </button>
+            <button type="submit" disabled={loading} className="btn btn-primary">
+              {loading ? t('common.loading') : t('trip_form.submit')}
             </button>
           </div>
         </form>
       ) : (
         <div className={styles.tripList}>
           {trips.length === 0 ? (
-            <p style={{ textAlign: 'center', padding: '32px 0' }}>{t('dashboard.no_trips')}</p>
+            <div className="empty">
+              <Icon name="map" size={28} />
+              {t('dashboard.no_trips')}
+            </div>
           ) : (
             trips.map((trip) => {
-              const daysCount = trip.days ? trip.days.length : 0;
+              const daysCount = Math.max(1, Math.round((startOfDay(trip.endDate) - startOfDay(trip.startDate)) / DAY_MS) + 1);
+              const status = getStatus(trip);
+              const start = new Date(trip.startDate);
               return (
-                <div key={trip.id} className={styles.tripCard} onClick={() => onTripSelect(trip.id)}>
-                  <div className={styles.tripHeader}>
-                    <div>
-                      <h4 className={styles.tripName}>{trip.name}</h4>
-                      <span className={styles.tripDest}>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                          <circle cx="12" cy="10" r="3"></circle>
-                        </svg>
-                        {trip.destination}
+                <button key={trip.id} className={styles.tripCard} onClick={() => onTripSelect(trip.id)}>
+                  <div className={styles.cardTop}>
+                    <div className={styles.dateTile}>
+                      <span className={styles.dateMonth}>
+                        {start.toLocaleDateString(locale === 'th' ? 'th-TH' : 'en-GB', { month: 'short' })}
                       </span>
+                      <span className={styles.dateDay}>{start.getDate()}</span>
                     </div>
-                    <span className={styles.dayBadge}>
+                    <span className={`status ${status.tone}`}>{status.label}</span>
+                  </div>
+
+                  <div className={styles.tripBody}>
+                    <span className={styles.tripName}>{trip.name}</span>
+                    <span className={styles.tripDest}>
+                      <Icon name="pin" size={14} />
+                      {trip.destination}
+                    </span>
+                  </div>
+
+                  <div className={styles.tripMeta}>
+                    <span>{formatDate(trip.startDate)} – {formatDate(trip.endDate, true)}</span>
+                    <span className={styles.tripDays}>
                       {t('dashboard.days_count', { count: daysCount })}
+                      <Icon name="arrowRight" size={16} className={styles.chevron} />
                     </span>
                   </div>
-                  <div className={styles.tripDetails}>
-                    <span className={styles.dateRange}>
-                      {t('dashboard.starts_on', { date: formatDate(trip.startDate) })}
-                    </span>
-                    <span className={styles.arrowIcon}>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                        <polyline points="12 5 19 12 12 19"></polyline>
-                      </svg>
-                    </span>
-                  </div>
-                </div>
+                </button>
               );
             })
           )}

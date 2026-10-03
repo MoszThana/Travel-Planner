@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/context/TranslationContext';
 import { useAuth } from '@/context/AuthContext';
 import { apiRequest } from '@/utils/api';
-import styles from './Itinerary.module.css'; // modal sheets
+import { Icon } from './Icon';
 import localStyles from './AIDrawer.module.css';
 
 interface AIDrawerProps {
@@ -267,231 +267,239 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ trip, onRefresh, userRole = 
   const isOwner = user?.id === trip.ownerId;
 
   return (
-    <div className={localStyles.container}>
-      <h2 className={localStyles.title}>{t('ai.title')}</h2>
-
-      {/* Weather Forecast Alerts */}
-      {weatherList.length > 0 && (
-        <div className={localStyles.sectionCard}>
-          <span className={localStyles.cardTitle}>☀️ Weather Warnings</span>
-          {weatherAlerts.length > 0 ? (
-            <div style={{ background: 'rgba(244, 63, 94, 0.08)', border: '1px solid rgba(244, 63, 94, 0.2)', padding: '12px', borderRadius: '8px', color: 'var(--accent)', fontSize: '12px', fontWeight: '700' }}>
-              ⚠️ Weather Warning: Rain or storm predicted on {weatherAlerts.join(', ')}. Outdoor plans might be affected.
-            </div>
-          ) : (
-            <div style={{ background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.2)', padding: '12px', borderRadius: '8px', color: '#22c55e', fontSize: '12px', fontWeight: '700' }}>
-              ☀️ Weather Outlook: Skies look clear. Great time for outdoor activities!
-            </div>
-          )}
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${weatherList.length}, 1fr)`, gap: '8px', marginTop: '6px' }}>
-            {weatherList.map((w, idx) => (
-              <div key={idx} style={{ background: 'var(--background)', padding: '8px', borderRadius: '8px', textAlign: 'center', fontSize: '11px' }}>
-                <div style={{ fontWeight: '700' }}>Day {idx + 1}</div>
-                <div style={{ fontSize: '14px', fontWeight: '800', margin: '4px 0' }}>{Math.round(w.main.temp)}°C</div>
-                <div style={{ color: 'var(--text-muted)' }}>{w.weather[0].main}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Interactive AI Recommendation desk & Voting list */}
-      <div className={localStyles.sectionCard}>
-        <span className={localStyles.cardTitle}>✨ Gemini Nearby Recommendation Drawer</span>
-        <form onSubmit={getAISuggestions} style={{ display: 'flex', gap: '8px' }}>
-          <input
-            type="text"
-            className={localStyles.searchInput}
-            style={{ flex: 1, boxShadow: 'none' }}
-            placeholder="What are you looking for? (e.g. parks, cafes)"
-            value={aiPrompt}
-            onChange={(e) => setAiPrompt(e.target.value)}
-          />
-          <button type="submit" disabled={loadingSuggestions} className={localStyles.copyBtn} style={{ background: 'var(--secondary)' }}>
-            {loadingSuggestions ? '...' : 'Ask AI'}
-          </button>
-        </form>
-
-        {suggestions.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
-            <span className={localStyles.cardTitle} style={{ fontSize: '11px', color: 'var(--text-muted)' }}>🗳️ Collaborative Votes (Like / Dislike to vote as group)</span>
-            
-            {suggestions.map((sug) => {
-              const uVote = userVotes[sug.id];
-              const tally = votes[sug.id] || { up: 0, down: 0 };
-
-              return (
-                <div key={sug.id} className={localStyles.suggestionCard}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <h4 className={localStyles.sugTitle}>📍 {sug.name}</h4>
-                      <p className={localStyles.sugDesc}>{sug.reason}</p>
-                    </div>
-                  </div>
-                  <div className={localStyles.voteRow}>
-                    <div className={localStyles.voteButtons}>
-                      <button 
-                        className={`${localStyles.voteBtn} ${uVote === 1 ? localStyles.voteBtnActiveUp : ''}`}
-                        onClick={() => handleVote(sug.id, 1)}
-                      >
-                        👍 {tally.up}
-                      </button>
-                      <button 
-                        className={`${localStyles.voteBtn} ${uVote === -1 ? localStyles.voteBtnActiveDown : ''}`}
-                        onClick={() => handleVote(sug.id, -1)}
-                      >
-                        👎 {tally.down}
-                      </button>
-                    </div>
-                    {isOwner && (
-                      <button 
-                        className={localStyles.copyBtn}
-                        style={{ padding: '4px 8px', fontSize: '10px' }}
-                        onClick={() => addSuggestionToItinerary(sug)}
-                      >
-                        + Add to Day 1
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+    <div className="page">
+      <div className="page-header">
+        <h1 className="page-title">{t('ai.title')}</h1>
       </div>
 
-      {/* Share settings */}
-      <div className={localStyles.sectionCard}>
-        <span className={localStyles.cardTitle}>🔗 Share Trip Link</span>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <select 
-            className={styles.select} 
-            style={{ padding: '6px', fontSize: '12px' }}
+      <div className="split">
+      <div className="stack">
+      {/* Weather */}
+      {weatherList.length > 0 && (
+        <section className="section">
+          <span className="eyebrow">Weather</span>
+          <div className="card">
+            <div className={weatherAlerts.length > 0 ? localStyles.alertWarn : localStyles.alertOk}>
+              <Icon name={weatherAlerts.length > 0 ? 'rain' : 'sun'} size={16} />
+              {weatherAlerts.length > 0
+                ? `Rain or storms expected on ${weatherAlerts.join(', ')}. Outdoor plans may be affected.`
+                : 'Clear skies ahead — a good stretch for outdoor plans.'}
+            </div>
+            <div className={localStyles.weatherGrid} style={{ gridTemplateColumns: `repeat(${weatherList.length}, 1fr)` }}>
+              {weatherList.map((w, idx) => {
+                const main = w.weather[0].main;
+                const icon = main === 'Rain' || main === 'Thunderstorm' || main === 'Drizzle' ? 'rain' : main === 'Clear' ? 'sun' : 'cloud';
+                return (
+                  <div key={idx} className={localStyles.weatherDay}>
+                    <span className={localStyles.weatherLabel}>{t('itinerary.day', { number: idx + 1 })}</span>
+                    <Icon name={icon} size={20} className={localStyles.weatherIcon} />
+                    <span className={localStyles.weatherTemp}>{Math.round(w.main.temp)}°</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* AI recommendations & voting */}
+      <section className="section">
+        <span className="eyebrow">Ask for ideas</span>
+        <div className="card">
+          <form onSubmit={getAISuggestions} className={localStyles.askRow}>
+            <input
+              type="text"
+              className="input"
+              placeholder="Parks, cafés, night markets…"
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+            />
+            <button type="submit" disabled={loadingSuggestions} className="btn btn-primary">
+              <Icon name="sparkles" size={15} />
+              {loadingSuggestions ? t('common.loading') : 'Ask'}
+            </button>
+          </form>
+
+          {suggestions.length > 0 && (
+            <>
+              <span className={localStyles.voteHint}>Vote together — tap to like or pass</span>
+              <div className={localStyles.suggestionList}>
+                {suggestions.map((sug) => {
+                  const uVote = userVotes[sug.id];
+                  const tally = votes[sug.id] || { up: 0, down: 0 };
+
+                  return (
+                    <div key={sug.id} className={localStyles.suggestionCard}>
+                      <div>
+                        <h3 className={localStyles.sugTitle}>{sug.name}</h3>
+                        <p className={localStyles.sugDesc}>{sug.reason}</p>
+                      </div>
+                      <div className={localStyles.voteRow}>
+                        <div className={localStyles.voteButtons}>
+                          <button
+                            className={`${localStyles.voteBtn} ${uVote === 1 ? localStyles.voteBtnActiveUp : ''}`}
+                            onClick={() => handleVote(sug.id, 1)}
+                            aria-label="Like"
+                          >
+                            <Icon name="thumbsUp" size={14} />
+                            {tally.up}
+                          </button>
+                          <button
+                            className={`${localStyles.voteBtn} ${uVote === -1 ? localStyles.voteBtnActiveDown : ''}`}
+                            onClick={() => handleVote(sug.id, -1)}
+                            aria-label="Dislike"
+                          >
+                            <Icon name="thumbsDown" size={14} />
+                            {tally.down}
+                          </button>
+                        </div>
+                        {isOwner && (
+                          <button className="btn btn-sm" onClick={() => addSuggestionToItinerary(sug)}>
+                            <Icon name="plus" size={14} />
+                            Add to Day 1
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+
+      </div>
+
+      <div className="stack">
+      {/* Share */}
+      <section className="section">
+        <span className="eyebrow">Share trip</span>
+        <div className="card">
+          <select
+            className="input input-sm"
             value={shareType}
             onChange={(e) => setShareType(e.target.value)}
           >
-            <option value="view">View Only Link</option>
-            <option value="edit">Editable Collaborator Invite</option>
+            <option value="view">View-only link</option>
+            <option value="edit">Collaborator invite (can edit)</option>
           </select>
-          <div className={localStyles.shareUrlBox} style={{ flex: 1, padding: '4px 8px' }}>
+          <div className={localStyles.shareUrlBox}>
+            <Icon name="link" size={15} className={localStyles.shareIcon} />
             <span className={localStyles.shareUrlText}>{shareLink}</span>
+            <button className="btn btn-sm" onClick={handleCopyLink}>
+              Copy
+            </button>
           </div>
-          <button className={localStyles.copyBtn} onClick={handleCopyLink}>
-            Copy
-          </button>
         </div>
-      </div>
+      </section>
 
-      {/* Emergency Board Directory */}
-      <div className={localStyles.sectionCard}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span className={localStyles.cardTitle}>🚨 Emergency Information Hub</span>
-          <button className={localStyles.copyBtn} style={{ background: 'var(--accent)', padding: '6px' }} onClick={() => setShowEmgForm(true)}>
-            + Add Contact
+      {/* Emergency */}
+      <section className="section">
+        <div className="section-head">
+          <span className="eyebrow">{t('emergency.title')}</span>
+          <button className="btn btn-sm" onClick={() => setShowEmgForm(true)}>
+            <Icon name="plus" size={14} />
+            Contact
           </button>
         </div>
 
-        <div className={localStyles.emergencyGrid}>
-          {/* Default Local Emergency Hotlines */}
-          <div className={localStyles.emergencyItem}>
+        <div className="list">
+          <div className="list-row">
             <div className={localStyles.emgDetails}>
-              <span className={localStyles.emgName}>Police Department Hotline</span>
-              <span className={localStyles.emgRelation}>Local Emergency</span>
+              <span className="list-title">Police</span>
+              <span className="list-sub">Local emergency</span>
             </div>
             <span className={localStyles.emgPhone}>191 / 110</span>
           </div>
-          <div className={localStyles.emergencyItem}>
+          <div className="list-row">
             <div className={localStyles.emgDetails}>
-              <span className={localStyles.emgName}>Medical Ambulance Hotline</span>
-              <span className={localStyles.emgRelation}>Medical Help</span>
+              <span className="list-title">Ambulance</span>
+              <span className="list-sub">Medical help</span>
             </div>
             <span className={localStyles.emgPhone}>1669 / 119</span>
           </div>
 
-          {/* User Added Emergency Details */}
           {trip.emergency?.map((emg: any) => (
-            <div key={emg.id} className={localStyles.emergencyItem}>
+            <div key={emg.id} className="list-row">
               <div className={localStyles.emgDetails}>
-                <span className={localStyles.emgName}>{emg.name}</span>
-                <span className={localStyles.emgRelation}>{emg.relation}</span>
-                {emg.note && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{emg.note}</span>}
+                <span className="list-title">{emg.name}</span>
+                <span className="list-sub">{emg.relation}</span>
+                {emg.note && <span className={localStyles.emgNote}>{emg.note}</span>}
               </div>
               <span className={localStyles.emgPhone}>{emg.phone}</span>
             </div>
           ))}
         </div>
+      </section>
+
+      </div>
       </div>
 
-      {/* Add Emergency Contact Drawer */}
+      {/* Add Emergency Contact Sheet */}
       {showEmgForm && (
-        <div className={styles.modalOverlay} onClick={() => setShowEmgForm(false)}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h3 className={localStyles.cardTitle} style={{ fontSize: '16px' }}>Add Emergency Contact</h3>
-            <form onSubmit={handleAddEmergencySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div className={styles.formGroup}>
-                <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                  Contact Name / Service
-                </label>
+        <div className="sheet-overlay" onClick={() => setShowEmgForm(false)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-head">
+              <h2 className="sheet-title">{t('emergency.add_contact')}</h2>
+              <button type="button" className="btn-icon" onClick={() => setShowEmgForm(false)} aria-label={t('common.cancel')}>
+                <Icon name="x" size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleAddEmergencySubmit} className="form">
+              <div className="field">
+                <label className="label">Name or service</label>
                 <input
                   type="text"
                   required
-                  className={styles.textarea}
-                  style={{ minHeight: 'unset' }}
-                  placeholder="e.g. Sunroute Hotel Frontdesk"
+                  className="input"
+                  placeholder="e.g. Sunroute Hotel front desk"
                   value={emgName}
                   onChange={(e) => setEmgName(e.target.value)}
                 />
               </div>
 
-              <div className={styles.formGrid}>
-                <div className={styles.formGroup}>
-                  <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                    Type / Relation
-                  </label>
+              <div className="field-row">
+                <div className="field">
+                  <label className="label">Relation</label>
                   <input
                     type="text"
                     required
-                    className={styles.textarea}
-                    style={{ minHeight: 'unset' }}
-                    placeholder="e.g. Lodging, Family, Embassy"
+                    className="input"
+                    placeholder="Lodging, family…"
                     value={emgRelation}
                     onChange={(e) => setEmgRelation(e.target.value)}
                   />
                 </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                    Phone Number
-                  </label>
+                <div className="field">
+                  <label className="label">Phone</label>
                   <input
                     type="text"
                     required
-                    className={styles.textarea}
-                    style={{ minHeight: 'unset' }}
-                    placeholder="e.g. +81-3333-2222"
+                    className="input"
+                    placeholder="+81 3 3333 2222"
                     value={emgPhone}
                     onChange={(e) => setEmgPhone(e.target.value)}
                   />
                 </div>
               </div>
 
-              <div className={styles.formGroup}>
-                <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                  Location Address or Medical Notes
-                </label>
+              <div className="field">
+                <label className="label">Address or medical notes</label>
                 <textarea
-                  className={styles.textarea}
-                  placeholder="Address or list allergies, medications, blood type"
+                  className="input"
+                  placeholder="Address, allergies, medications, blood type"
                   value={emgNote}
                   onChange={(e) => setEmgNote(e.target.value)}
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                <button type="submit" className={styles.addDayBtn} style={{ flex: 2, background: 'var(--primary)', color: 'white', border: 'none' }}>
-                  {t('common.save')}
-                </button>
-                <button type="button" className={styles.addDayBtn} style={{ flex: 1 }} onClick={() => setShowEmgForm(false)}>
+              <div className="btn-row">
+                <button type="button" className="btn" onClick={() => setShowEmgForm(false)}>
                   {t('common.cancel')}
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  {t('common.save')}
                 </button>
               </div>
             </form>

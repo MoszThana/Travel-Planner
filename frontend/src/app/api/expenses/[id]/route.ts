@@ -14,10 +14,11 @@ export async function DELETE(
     
     const db = await getSafeDb();
 
-    await db.transaction(async (tx: any) => {
-      await tx.delete(schema.expenseSplits).where(eq(schema.expenseSplits.expenseId, id));
-      await tx.delete(schema.groupExpenses).where(eq(schema.groupExpenses.id, id));
-    });
+    // Delete splits then the expense atomically. Cloudflare D1 rejects BEGIN TRANSACTION, so use batch()
+    await db.batch([
+      db.delete(schema.expenseSplits).where(eq(schema.expenseSplits.expenseId, id)),
+      db.delete(schema.groupExpenses).where(eq(schema.groupExpenses.id, id))
+    ]);
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

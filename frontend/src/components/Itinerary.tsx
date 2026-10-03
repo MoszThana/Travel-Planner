@@ -8,6 +8,9 @@ import { apiRequest } from '@/utils/api';
 import styles from './Itinerary.module.css';
 import { AttachmentsModal } from './AttachmentsModal';
 import { MembersModal } from './MembersModal';
+import { Icon, TRANSPORT_ICONS } from './Icon';
+import { GoogleMapEmbed } from './GoogleMapEmbed';
+import { hasPoint, googleDirectionsUrl, googlePlaceUrl } from '@/utils/maps';
 
 interface ItineraryProps {
   trip: any;
@@ -25,6 +28,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [editingActivity, setEditingActivity] = useState<any | null>(null);
+  const [openMaps, setOpenMaps] = useState<Record<string, boolean>>({});
 
   // Form Fields
   const [name, setName] = useState('');
@@ -35,6 +39,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
   const [estCost, setEstCost] = useState('0');
   const [costCategory, setCostCategory] = useState('other');
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
 
   // Leaflet map select states and refs
   const [selectedLat, setSelectedLat] = useState<number | null>(null);
@@ -261,6 +266,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
   };
 
   const handleCloseForm = () => {
+    setFormError('');
     setEditingActivity(null);
     setName('');
     setTime('12:00');
@@ -323,7 +329,12 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
 
   const handleAddActivity = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !activeDay) return;
+    setFormError('');
+    if (!name) return;
+    if (!activeDay) {
+      setFormError('This trip has no days loaded yet. Go back and open the trip again, or add a day first.');
+      return;
+    }
 
     setSaving(true);
     const newOrder = activeDayActivities.length + 1;
@@ -372,6 +383,11 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
           });
         }
         localStorage.setItem('offline_trips', JSON.stringify(offlineTrips));
+      } else {
+        // Nowhere to keep it: leave the form open so nothing typed is lost
+        setFormError(err instanceof Error ? `Couldn't save: ${err.message}` : "Couldn't save the activity. Please try again.");
+        setSaving(false);
+        return;
       }
     }
 
@@ -511,34 +527,46 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.headerRow} style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '8px' }}>
-        <button className={styles.backBtn} onClick={onBack}>
-          ← {t('common.back')}
+    <div className={`page ${styles.page}`}>
+      {/* Trip header */}
+      <div className={styles.topBar}>
+        <button className="btn-icon" onClick={onBack} aria-label={t('common.back')}>
+          <Icon name="arrowLeft" size={20} />
         </button>
-        <span className={styles.tripTitle} style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{trip.name}</span>
-        <button className={styles.addDayBtn} onClick={() => setShowMembersModal(true)} style={{ margin: 0, padding: '6px 12px', fontSize: '13px', width: 'auto', background: 'var(--primary)', color: 'white', border: 'none' }}>
-          👥 Members
-        </button>
-        <button className={styles.addDayBtn} onClick={() => setShowAttachmentsModal(true)} style={{ margin: 0, padding: '6px 12px', fontSize: '13px', width: 'auto' }}>
-          📎 Files
-        </button>
+        <div className={styles.topActions}>
+          <button className="btn btn-sm" onClick={() => setShowMembersModal(true)}>
+            <Icon name="users" size={15} />
+            Members
+          </button>
+          <button className="btn btn-sm" onClick={() => setShowAttachmentsModal(true)}>
+            <Icon name="paperclip" size={15} />
+            Files
+          </button>
+        </div>
+      </div>
+
+      <div className={styles.titleBlock}>
+        <span className="eyebrow">{trip.destination}</span>
+        <h1 className="page-title">{trip.name}</h1>
       </div>
 
       {/* Day Navigation Tabs */}
-      <div className={styles.dayTabs}>
+      <div className="pill-tabs">
         {trip.days?.map((d: any, idx: number) => (
           <button
             key={d.id}
-            className={`${styles.dayTab} ${activeDayIdx === idx ? styles.dayTabActive : ''}`}
+            className={`pill-tab ${activeDayIdx === idx ? 'active' : ''}`}
             onClick={() => setActiveDayIdx(idx)}
           >
             {t('itinerary.day', { number: d.dayNumber })}
+            <span className={styles.dayDate}>
+              {new Date(d.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+            </span>
           </button>
         ))}
         {userRole !== 'viewer' && (
-          <button className={styles.addDayBtn} onClick={handleAddDay}>
-            + Day
+          <button className="pill-tab dashed" onClick={handleAddDay} aria-label="Add day">
+            <Icon name="plus" size={14} />
           </button>
         )}
       </div>
@@ -547,18 +575,14 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
       {gapAlerts.length > 0 && (
         <div className={styles.gapBanner}>
           <div className={styles.gapTitle}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-              <line x1="12" y1="9" x2="12" y2="13"></line>
-              <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>
+            <Icon name="alert" size={16} />
             {t('ai.smart_gap')}
           </div>
-          <div className={styles.gapList}>
+          <ul className={styles.gapList}>
             {gapAlerts.map((a: any, i: number) => (
-              <span key={i} className={styles.gapItem}>⚠️ {a.message}</span>
+              <li key={i} className={styles.gapItem}>{a.message}</li>
             ))}
-          </div>
+          </ul>
         </div>
       )}
 
@@ -572,7 +596,8 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
               className={styles.timeline}
             >
               {activeDayActivities.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)' }}>
+                <div className="empty">
+                  <Icon name="calendar" size={28} />
                   {t('itinerary.no_activities')}
                 </div>
               ) : (
@@ -580,6 +605,8 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
                   const isVisited = act.visited === 1;
                   const hasPrediction = !!costPredictions[act.id];
                   const hasRecs = !!recList[act.id];
+                  const prev = index > 0 ? activeDayActivities[index - 1] : null;
+                  const transport = act.transportType || 'other';
 
                   return (
                     <Draggable key={act.id} draggableId={act.id} index={index} isDragDisabled={userRole === 'viewer'}>
@@ -590,129 +617,128 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
                           {...dragProvided.dragHandleProps}
                           className={styles.activityWrapper}
                         >
-                          <div className={`${styles.timelineDot} ${isVisited ? styles.timelineDotVisited : ''}`} />
-                          
-                          <div className={styles.activityCard}>
+                          <div className={styles.rail}>
+                            <span className={`${styles.timeLabel} tabular`}>{act.time}</span>
+                            <span className={`${styles.timelineDot} ${isVisited ? styles.timelineDotVisited : ''}`}>
+                              {isVisited && <Icon name="check" size={10} strokeWidth={3} />}
+                            </span>
+                          </div>
+
+                          <div className={`${styles.activityCard} ${isVisited ? styles.activityCardVisited : ''}`}>
                             <div className={styles.cardHeader}>
-                              <div>
-                                <span className={styles.timeBadge}>{act.time}</span>
-                                <h4 className={`${styles.cardTitle} ${isVisited ? styles.cardTitleVisited : ''}`}>
-                                  {act.name}
-                                </h4>
-                              </div>
+                              <h3 className={`${styles.cardTitle} ${isVisited ? styles.cardTitleVisited : ''}`}>
+                                {act.name}
+                              </h3>
                               {userRole !== 'viewer' && (
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                  <button className={styles.deleteBtn} style={{ color: 'var(--primary)' }} onClick={() => handleEditClick(act)}>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                      <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4z"></path>
-                                    </svg>
+                                <div className={styles.cardActions}>
+                                  <button className="btn-icon" onClick={() => handleEditClick(act)} aria-label={t('common.edit')}>
+                                    <Icon name="edit" size={16} />
                                   </button>
-                                  <button className={styles.deleteBtn} onClick={() => handleDeleteActivity(act.id)}>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                      <polyline points="3 6 5 6 21 6"></polyline>
-                                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                      <line x1="10" y1="11" x2="10" y2="17"></line>
-                                      <line x1="14" y1="11" x2="14" y2="17"></line>
-                                    </svg>
+                                  <button className="btn-icon danger" onClick={() => handleDeleteActivity(act.id)} aria-label={t('common.delete')}>
+                                    <Icon name="trash" size={16} />
                                   </button>
                                 </div>
                               )}
                             </div>
 
-                            {act.location && (
-                              <div className={styles.locationRow}>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                                  <circle cx="12" cy="10" r="3"></circle>
-                                </svg>
-                                {act.location}
-                              </div>
-                            )}
-
-                            {/* Show transport mode and directions link if there is a previous activity to route from */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', background: 'var(--background)', padding: '6px 8px', borderRadius: '4px' }}>
-                              <span>
-                                {act.transportType === 'walk' ? '🚶 Walk' :
-                                 act.transportType === 'train' ? '🚆 Train' :
-                                 act.transportType === 'car' ? '🚗 Car' :
-                                 act.transportType === 'flight' ? '✈️ Flight' :
-                                 act.transportType === 'bus' ? '🚌 Bus' : '🚌 Transport'}
-                              </span>
-                              {index > 0 && activeDayActivities[index - 1].location && act.location && (
-                                <a 
-                                  href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(activeDayActivities[index - 1].location)}&destination=${encodeURIComponent(act.location)}&travelmode=${
-                                    act.transportType === 'walk' ? 'walking' :
-                                    act.transportType === 'car' ? 'driving' :
-                                    act.transportType === 'train' || act.transportType === 'bus' ? 'transit' : 'driving'
-                                  }`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{ color: 'var(--secondary)', textDecoration: 'underline', fontWeight: '700' }}
-                                >
-                                  Map Directions →
-                                </a>
+                            <div className={styles.metaRow}>
+                              {act.location && (
+                                <span className={styles.metaItem}>
+                                  <Icon name="pin" size={13} />
+                                  {act.location}
+                                </span>
                               )}
+                              <span className={styles.metaItem}>
+                                <Icon name={TRANSPORT_ICONS[transport] || 'route'} size={13} />
+                                {t(`itinerary.transport_${transport}`)}
+                              </span>
                             </div>
 
                             {act.notes && (
                               <p className={styles.notes}>{act.notes}</p>
                             )}
 
+                            {/* Google Maps: navigate in the app, or preview the place / route here */}
+                            {hasPoint(act) && (
+                              <div className={styles.mapActions}>
+                                <a
+                                  href={googleDirectionsUrl(act, { transportType: act.transportType })}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="btn btn-sm btn-primary"
+                                >
+                                  <Icon name="route" size={15} />
+                                  Navigate
+                                </a>
+                                <button
+                                  className="btn btn-sm"
+                                  onClick={() => setOpenMaps(prevOpen => ({ ...prevOpen, [act.id]: !prevOpen[act.id] }))}
+                                  aria-expanded={!!openMaps[act.id]}
+                                >
+                                  <Icon name="map" size={15} />
+                                  {openMaps[act.id] ? 'Hide map' : 'Show map'}
+                                </button>
+                              </div>
+                            )}
+
+                            {hasPoint(act) && openMaps[act.id] && (
+                              <GoogleMapEmbed place={act} from={prev} transportType={act.transportType} />
+                            )}
+
                             {/* Card controls & spending details */}
                             <div className={styles.cardFooter}>
-                              <div className={styles.leftControls}>
-                                <label className={`${styles.checkinLabel} ${isVisited ? styles.checkinLabelVisited : ''}`}>
-                                  <input
-                                    type="checkbox"
-                                    className={styles.checkbox}
-                                    checked={isVisited}
-                                    disabled={userRole === 'viewer'}
-                                    onChange={() => handleCheckinToggle(act)}
-                                  />
-                                  {isVisited ? t('itinerary.visited') : t('itinerary.mark_visited')}
-                                </label>
-                              </div>
+                              <label className={`${styles.checkinLabel} ${isVisited ? styles.checkinLabelVisited : ''}`}>
+                                <input
+                                  type="checkbox"
+                                  className="checkbox"
+                                  checked={isVisited}
+                                  disabled={userRole === 'viewer'}
+                                  onChange={() => handleCheckinToggle(act)}
+                                />
+                                {isVisited ? t('itinerary.visited') : t('itinerary.mark_visited')}
+                              </label>
 
                               <div className={styles.costGroup}>
-                                <span className={`${styles.costBadge} ${styles.estCost}`}>
-                                  Est: {act.estCost}
-                                </span>
+                                <span className="chip tabular">Est. {Number(act.estCost || 0).toLocaleString()}</span>
                                 {act.actCost > 0 && (
-                                  <span className={`${styles.costBadge} ${styles.actCost}`}>
-                                    Act: {act.actCost}
-                                  </span>
+                                  <span className="chip chip-accent tabular">Spent {Number(act.actCost).toLocaleString()}</span>
                                 )}
                               </div>
                             </div>
 
                             {/* AI Action Hooks */}
                             <div className={styles.aiActions}>
-                              <button className={styles.aiCardBtn} onClick={() => triggerCostPredictor(act)}>
-                                {loadingAI[`cost-${act.id}`] ? '...' : '✨ ' + t('ai.cost_predictor')}
+                              <button className={styles.aiCardBtn} onClick={() => triggerCostPredictor(act)} disabled={loadingAI[`cost-${act.id}`]}>
+                                <Icon name="sparkles" size={13} />
+                                {loadingAI[`cost-${act.id}`] ? t('common.loading') : t('ai.cost_predictor')}
                               </button>
-                              <button className={styles.aiCardBtn} onClick={() => triggerAIPoints(act)}>
-                                {loadingAI[`rec-${act.id}`] ? '...' : '✨ ' + t('ai.recommendations')}
+                              <button className={styles.aiCardBtn} onClick={() => triggerAIPoints(act)} disabled={loadingAI[`rec-${act.id}`]}>
+                                <Icon name="sparkles" size={13} />
+                                {loadingAI[`rec-${act.id}`] ? t('common.loading') : t('ai.recommendations')}
                               </button>
                             </div>
 
                             {/* AI Prediction Outputs */}
                             {hasPrediction && (
                               <div className={styles.aiPredictBox}>
-                                <div className={styles.aiPredictTitle}>🤖 Gemini Predictor</div>
-                                <div>Est. Cost Range: {costPredictions[act.id].minPrice} - {costPredictions[act.id].maxPrice} {costPredictions[act.id].currency}</div>
-                                <div style={{ fontSize: '10px', marginTop: '2px' }}>{costPredictions[act.id].explanation}</div>
+                                <span className={styles.aiPredictTitle}>Estimated cost</span>
+                                <span className={styles.aiPredictValue}>
+                                  {costPredictions[act.id].minPrice} – {costPredictions[act.id].maxPrice} {costPredictions[act.id].currency}
+                                </span>
+                                <span>{costPredictions[act.id].explanation}</span>
                               </div>
                             )}
 
                             {/* AI Recommendations Outputs */}
                             {hasRecs && (
                               <div className={styles.aiPredictBox}>
-                                <div className={styles.aiPredictTitle} style={{ color: 'var(--primary)' }}>🤖 Nearby Highlights</div>
-                                <ul style={{ listStyleType: 'none', paddingLeft: 0, marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <span className={styles.aiPredictTitle}>Nearby highlights</span>
+                                <ul className={styles.recList}>
                                   {recList[act.id].map((rec, i) => (
                                     <li key={i}>
-                                      <strong>📍 {rec.name}</strong> ({rec.category}) - <span style={{ fontSize: '10px' }}>{rec.reason}</span>
+                                      <strong>{rec.name}</strong>
+                                      <span className={styles.recCategory}>{rec.category}</span>
+                                      <span className={styles.recReason}>{rec.reason}</span>
                                     </li>
                                   ))}
                                 </ul>
@@ -732,51 +758,49 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
       </DragDropContext>
 
       {userRole !== 'viewer' && (
-        <button className={styles.addDayBtn} style={{ marginTop: 12, borderStyle: 'solid', background: 'var(--surface)' }} onClick={() => setShowAddForm(true)}>
-          + {t('itinerary.add_activity')}
+        <button className={styles.addActivityBtn} onClick={() => setShowAddForm(true)}>
+          <Icon name="plus" size={16} />
+          {t('itinerary.add_activity')}
         </button>
       )}
 
       {/* Add/Edit Activity Modal Sheet */}
       {showAddForm && (
-        <div className={styles.modalOverlay} onClick={handleCloseForm}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h3 className={styles.tripTitle}>{editingActivity ? 'Edit Activity' : t('itinerary.add_activity')}</h3>
-            <form onSubmit={handleAddActivity} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div className={styles.formGroup}>
-                <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                  {t('itinerary.activity_name')}
-                </label>
+        <div className="sheet-overlay" onClick={handleCloseForm}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-head">
+              <h2 className="sheet-title">{editingActivity ? 'Edit activity' : t('itinerary.add_activity')}</h2>
+              <button type="button" className="btn-icon" onClick={handleCloseForm} aria-label={t('common.cancel')}>
+                <Icon name="x" size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleAddActivity} className="form">
+              <div className="field">
+                <label className="label">{t('itinerary.activity_name')}</label>
                 <input
                   type="text"
                   required
-                  className={styles.textarea}
-                  style={{ minHeight: 'unset' }}
+                  className="input"
                   placeholder="e.g., Tokyo Tower Visit"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
               </div>
 
-              <div className={styles.formGrid}>
-                <div className={styles.formGroup}>
-                  <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                    {t('itinerary.time')}
-                  </label>
+              <div className="field-row">
+                <div className="field">
+                  <label className="label">{t('itinerary.time')}</label>
                   <input
                     type="time"
-                    className={styles.textarea}
-                    style={{ minHeight: 'unset' }}
+                    className="input"
                     value={time}
                     onChange={(e) => setTime(e.target.value)}
                   />
                 </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                    {t('itinerary.transport')}
-                  </label>
+                <div className="field">
+                  <label className="label">{t('itinerary.transport')}</label>
                   <select
-                    className={styles.select}
+                    className="input"
                     value={transportType}
                     onChange={(e) => setTransportType(e.target.value)}
                   >
@@ -790,25 +814,20 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
                 </div>
               </div>
 
-              <div className={styles.formGrid}>
-                <div className={styles.formGroup}>
-                  <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                    {t('itinerary.est_cost')}
-                  </label>
+              <div className="field-row">
+                <div className="field">
+                  <label className="label">{t('itinerary.est_cost')}</label>
                   <input
                     type="number"
-                    className={styles.textarea}
-                    style={{ minHeight: 'unset' }}
+                    className="input"
                     value={estCost}
                     onChange={(e) => setEstCost(e.target.value)}
                   />
                 </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                    Cost Category
-                  </label>
+                <div className="field">
+                  <label className="label">Category</label>
                   <select
-                    className={styles.select}
+                    className="input"
                     value={costCategory}
                     onChange={(e) => setCostCategory(e.target.value)}
                   >
@@ -823,15 +842,15 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
                 </div>
               </div>
 
-              <div className={styles.formGroup} style={{ position: 'relative' }}>
-                <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                  Location Name
+              <div className="field">
+                <label className="label">
+                  Location
+                  {searching && <span className={styles.searchingHint}>Searching…</span>}
                 </label>
                 <input
                   type="text"
-                  className={styles.textarea}
-                  style={{ minHeight: 'unset' }}
-                  placeholder="Address or Google Places Name"
+                  className="input"
+                  placeholder="Search an address or place"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   onFocus={() => {
@@ -841,86 +860,69 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
                   }}
                 />
 
-                {/* Search suggestion indicator */}
-                {searching && (
-                  <div style={{ position: 'absolute', right: '12px', top: '34px', fontSize: '11px', color: 'var(--text-muted)' }}>
-                    Searching...
-                  </div>
-                )}
-
                 {/* Suggestions Overlay Dropdown */}
                 {showSuggestions && suggestions.length > 0 && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
-                    zIndex: 2000,
-                    maxHeight: '200px',
-                    overflowY: 'auto',
-                    marginTop: '4px'
-                  }}>
+                  <div className={styles.suggestions}>
                     {suggestions.map((item, idx) => (
-                      <div
+                      <button
+                        type="button"
                         key={idx}
+                        className={styles.suggestionItem}
                         onClick={() => handleSelectSuggestion(item)}
-                        style={{
-                          padding: '10px 14px',
-                          borderBottom: idx === suggestions.length - 1 ? 'none' : '1px solid var(--border)',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          color: 'var(--text)',
-                          transition: 'background 0.2s',
-                          background: 'transparent'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--hover)'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                       >
-                        <strong style={{ color: 'var(--primary)' }}>{item.name || item.display_name.split(',')[0]}</strong>
-                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {item.display_name}
-                        </div>
-                      </div>
+                        <Icon name="pin" size={14} className={styles.suggestionIcon} />
+                        <span className={styles.suggestionText}>
+                          <strong>{item.name || item.display_name.split(',')[0]}</strong>
+                          <span>{item.display_name}</span>
+                        </span>
+                      </button>
                     ))}
                   </div>
                 )}
               </div>
 
               {/* Pin on Map selection section */}
-              <div className={styles.formGroup}>
-                <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>📍 Pin on Map (Tap map to select location)</span>
-                  {selectedLat && (
-                    <span style={{ fontSize: '10px', color: 'var(--primary)', fontWeight: 'bold' }}>
-                      ({selectedLat.toFixed(4)}, {selectedLng?.toFixed(4)})
-                    </span>
+              <div className="field">
+                <label className="label">
+                  Pin on map
+                  {selectedLat ? (
+                    <span className="tabular">{selectedLat.toFixed(4)}, {selectedLng?.toFixed(4)}</span>
+                  ) : (
+                    <span>Tap the map to choose</span>
                   )}
                 </label>
-                <div id="select-map-container" style={{ width: '100%', height: '180px', borderRadius: '8px', border: '1px solid var(--border)', overflow: 'hidden', marginTop: '4px', zIndex: 1 }} />
+                <div id="select-map-container" className={styles.selectMap} />
+                {(selectedLat || location.trim()) && (
+                  <a
+                    href={googlePlaceUrl({ location, lat: selectedLat, lng: selectedLng })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.checkLink}
+                  >
+                    Check on Google Maps
+                    <Icon name="arrowUpRight" size={12} />
+                  </a>
+                )}
               </div>
 
-              <div className={styles.formGroup}>
-                <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                  {t('itinerary.notes')}
-                </label>
+              <div className="field">
+                <label className="label">{t('itinerary.notes')}</label>
                 <textarea
-                  className={styles.textarea}
-                  placeholder="Important notes, codes, phone numbers"
+                  className="input"
+                  placeholder="Booking codes, phone numbers, reminders"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                <button type="submit" disabled={saving} className={styles.addDayBtn} style={{ flex: 2, background: 'var(--primary)', color: 'white', border: 'none' }}>
-                  {saving ? t('common.loading') : t('common.save')}
-                </button>
-                <button type="button" className={styles.addDayBtn} style={{ flex: 1 }} onClick={handleCloseForm}>
+              {formError && <div className="form-error">{formError}</div>}
+
+              <div className="btn-row">
+                <button type="button" className="btn" onClick={handleCloseForm}>
                   {t('common.cancel')}
+                </button>
+                <button type="submit" disabled={saving} className="btn btn-primary">
+                  {saving ? t('common.loading') : t('common.save')}
                 </button>
               </div>
             </form>
@@ -928,10 +930,10 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
         </div>
       )}
 
-      <AttachmentsModal 
-        tripId={trip.id} 
-        isOpen={showAttachmentsModal} 
-        onClose={() => setShowAttachmentsModal(false)} 
+      <AttachmentsModal
+        tripId={trip.id}
+        isOpen={showAttachmentsModal}
+        onClose={() => setShowAttachmentsModal(false)}
       />
 
       <MembersModal

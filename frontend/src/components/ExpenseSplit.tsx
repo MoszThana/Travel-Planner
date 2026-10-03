@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useTranslation } from '@/context/TranslationContext';
 import { useAuth } from '@/context/AuthContext';
 import { apiRequest } from '@/utils/api';
-import styles from './Itinerary.module.css'; // sharing modal overlays
+import { Icon } from './Icon';
 import localStyles from './ExpenseSplit.module.css';
 
 interface ExpenseSplitProps {
@@ -256,127 +256,138 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
   const isOwner = user?.id === trip.ownerId;
 
   return (
-    <div className={localStyles.container}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 className={localStyles.title}>{t('group.title')}</h2>
+    <div className="page">
+      <div className="page-header">
+        <h1 className="page-title">{t('group.title')}</h1>
         {userRole !== 'viewer' && (
-          <button className={localStyles.approveBtn} style={{ flex: 'unset', padding: '8px 12px' }} onClick={() => setShowAddForm(true)}>
-            + Record Cost
+          <button className="btn btn-primary btn-sm" onClick={() => setShowAddForm(true)}>
+            <Icon name="plus" size={16} />
+            Expense
           </button>
         )}
       </div>
 
-      {/* Members Section */}
-      <div className={localStyles.sectionCard}>
-        <span className={localStyles.cardTitle}>{t('group.members')}</span>
+      <div className="split">
+      <div className="stack">
+      {/* Members */}
+      <section className="section">
+        <span className="eyebrow">{t('group.members')}</span>
         <div className={localStyles.memberList}>
           {members.map((m: any) => (
             <div key={m.id} className={localStyles.memberItem}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={m.avatarUrl} alt={m.name} className={localStyles.memberAvatar} style={{ borderColor: m.role === 'owner' ? 'var(--primary)' : 'var(--border)' }} />
+              <img
+                src={m.avatarUrl}
+                alt={m.name}
+                className={`${localStyles.memberAvatar} ${m.role === 'owner' ? localStyles.memberAvatarOwner : ''}`}
+              />
               <span className={localStyles.memberName}>{m.name}</span>
             </div>
           ))}
         </div>
-      </div>
+      </section>
 
-      {/* Owner Approvals Queue Panel */}
+      {/* Owner Approvals Queue */}
       {isOwner && suggestions.length > 0 && (
-        <div className={localStyles.sectionCard} style={{ background: 'rgba(6, 182, 212, 0.02)' }}>
-          <span className={localStyles.cardTitle} style={{ color: 'var(--secondary)' }}>📋 Pending Suggestions ({suggestions.length})</span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <section className="section">
+          <span className="eyebrow">Pending suggestions · {suggestions.length}</span>
+          <div className="list">
             {suggestions.map((sug) => (
-              <div key={sug.id} className={localStyles.approvalCard}>
+              <div key={sug.id} className={`list-row ${localStyles.approvalCard}`}>
                 <div className={localStyles.approvalHeader}>
-                  <strong style={{ fontSize: '13px' }}>{sug.payload.description}</strong>
-                  <span className={localStyles.suggestedBy}>Suggested by: {sug.suggestedBy}</span>
+                  <span className="list-title">{sug.payload.description}</span>
+                  <span className="chip">by {sug.suggestedBy}</span>
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                  Payer: {getUserName(sug.payload.payerId)} | Amount: {sug.payload.amount} THB
-                </div>
-                <div className={localStyles.actionRow}>
-                  <button className={localStyles.approveBtn} onClick={() => handleApproveSuggestion(sug.id, sug.payload)}>
-                    Approve & Commit
-                  </button>
-                  <button className={localStyles.rejectBtn} onClick={() => setSuggestions(prev => prev.filter(s => s.id !== sug.id))}>
+                <span className="list-sub">
+                  {getUserName(sug.payload.payerId)} paid {sug.payload.amount} THB
+                </span>
+                <div className="btn-row">
+                  <button className="btn btn-sm" onClick={() => setSuggestions(prev => prev.filter(s => s.id !== sug.id))}>
                     Reject
+                  </button>
+                  <button className="btn btn-sm btn-primary" onClick={() => handleApproveSuggestion(sug.id, sug.payload)}>
+                    Approve
                   </button>
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
+      </div>
+
+      <div className="stack">
       {/* Debt Settlement Summary */}
-      <div className={localStyles.sectionCard}>
-        <span className={localStyles.cardTitle}>{t('group.who_owes_whom')}</span>
-        <div className={localStyles.debtList}>
-          {settlements.length === 0 ? (
-            <p style={{ textAlign: 'center', fontSize: '12px', padding: '16px 0', color: 'var(--text-muted)' }}>
-              🎉 {t('group.no_debts')}
-            </p>
-          ) : (
-            settlements.map((set, idx) => (
-              <div key={idx} className={localStyles.debtItem}>
+      <section className="section">
+        <span className="eyebrow">{t('group.who_owes_whom')}</span>
+        {settlements.length === 0 ? (
+          <div className={`card ${localStyles.settled}`}>
+            <Icon name="check" size={18} />
+            {t('group.no_debts')}
+          </div>
+        ) : (
+          <div className="list">
+            {settlements.map((set, idx) => (
+              <div key={idx} className="list-row">
                 <div className={localStyles.debtActor}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={getUserAvatar(set.from)} alt="" style={{ width: '20px', height: '20px', borderRadius: '50%' }} />
+                  <img src={getUserAvatar(set.from)} alt="" className="avatar avatar-sm" />
                   <span>{getUserName(set.from)}</span>
-                  <span className={localStyles.debtArrow}>➜</span>
+                  <Icon name="arrowRight" size={14} className={localStyles.debtArrow} />
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={getUserAvatar(set.to)} alt="" style={{ width: '20px', height: '20px', borderRadius: '50%' }} />
+                  <img src={getUserAvatar(set.to)} alt="" className="avatar avatar-sm" />
                   <span>{getUserName(set.to)}</span>
                 </div>
                 <span className={localStyles.debtAmount}>{Math.round(set.amount).toLocaleString()} THB</span>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      </div>
       </div>
 
-      {/* Add Expense Drawer */}
+      {/* Add Expense Sheet */}
       {showAddForm && (
-        <div className={styles.modalOverlay} onClick={() => setShowAddForm(false)}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h3 className={localStyles.cardTitle} style={{ fontSize: '16px' }}>Record Shared Expense</h3>
-            <form onSubmit={handleAddExpenseSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div className={styles.formGroup}>
-                <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                  Description / Activity
-                </label>
+        <div className="sheet-overlay" onClick={() => setShowAddForm(false)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-head">
+              <h2 className="sheet-title">Shared expense</h2>
+              <button type="button" className="btn-icon" onClick={() => setShowAddForm(false)} aria-label={t('common.cancel')}>
+                <Icon name="x" size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleAddExpenseSubmit} className="form">
+              <div className="field">
+                <label className="label">Description</label>
                 <input
                   type="text"
                   required
-                  className={styles.textarea}
-                  style={{ minHeight: 'unset' }}
+                  className="input"
                   placeholder="e.g., Dinner at Shibuya"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                 />
               </div>
 
-              <div className={styles.formGrid}>
-                <div className={styles.formGroup}>
-                  <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                    Total Amount (THB)
-                  </label>
+              <div className="field-row">
+                <div className="field">
+                  <label className="label">Amount (THB)</label>
                   <input
                     type="number"
                     required
-                    className={styles.textarea}
-                    style={{ minHeight: 'unset' }}
-                    placeholder="Total cost"
+                    className="input"
+                    placeholder="0"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                   />
                 </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                    Paid By
-                  </label>
+                <div className="field">
+                  <label className="label">{t('group.paid_by')}</label>
                   <select
-                    className={styles.select}
+                    className="input"
                     value={payerId}
                     onChange={(e) => setPayerId(e.target.value)}
                   >
@@ -387,13 +398,11 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
                 </div>
               </div>
 
-              <div className={styles.formGrid}>
-                <div className={styles.formGroup}>
-                  <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                    Category
-                  </label>
+              <div className="field-row">
+                <div className="field">
+                  <label className="label">Category</label>
                   <select
-                    className={styles.select}
+                    className="input"
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
                   >
@@ -405,12 +414,10 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
                     <option value="other">Other</option>
                   </select>
                 </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                    Split Scheme
-                  </label>
+                <div className="field">
+                  <label className="label">Split</label>
                   <select
-                    className={styles.select}
+                    className="input"
                     value={splitType}
                     onChange={(e) => setSplitType(e.target.value)}
                   >
@@ -421,22 +428,22 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
               </div>
 
               {/* Share checklist */}
-              <div className={styles.formGroup}>
-                <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                  Shared By (Select Members)
-                </label>
-                <div className={localStyles.checkboxGrid}>
+              <div className="field">
+                <label className="label">{t('group.shared_by')}</label>
+                <div className="list">
                   {members.map((m: any) => {
                     const isChecked = !!sharesCheck[m.id];
                     return (
-                      <div key={m.id} className={localStyles.checkboxItem}>
+                      <div key={m.id} className={`list-row ${localStyles.checkboxItem}`}>
                         <label className={localStyles.checkboxLabel}>
                           <input
                             type="checkbox"
-                            className={styles.checkbox}
+                            className="checkbox"
                             checked={isChecked}
                             onChange={(e) => setSharesCheck(prev => ({ ...prev, [m.id]: e.target.checked }))}
                           />
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={m.avatarUrl} alt="" className="avatar avatar-sm" />
                           <span>{m.name}</span>
                         </label>
 
@@ -445,7 +452,7 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
                           <input
                             type="number"
                             placeholder="THB"
-                            className={localStyles.customSplitInput}
+                            className={`input input-sm tabular ${localStyles.customSplitInput}`}
                             value={customSplits[m.id] || ''}
                             onChange={(e) => setCustomSplits(prev => ({ ...prev, [m.id]: e.target.value }))}
                           />
@@ -456,12 +463,12 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                <button type="submit" className={styles.addDayBtn} style={{ flex: 2, background: 'var(--primary)', color: 'white', border: 'none' }}>
-                  {t('common.save')}
-                </button>
-                <button type="button" className={styles.addDayBtn} style={{ flex: 1 }} onClick={() => setShowAddForm(false)}>
+              <div className="btn-row">
+                <button type="button" className="btn" onClick={() => setShowAddForm(false)}>
                   {t('common.cancel')}
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  {t('common.save')}
                 </button>
               </div>
             </form>

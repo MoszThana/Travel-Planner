@@ -24,9 +24,10 @@ export async function POST(request: Request) {
 
     const expenseId = generateUUID();
 
-    await db.transaction(async (tx: any) => {
+    // Insert the expense and its splits atomically. Cloudflare D1 rejects BEGIN TRANSACTION, so use batch()
+    await db.batch([
       // 1. Insert Group Expense
-      await tx.insert(schema.groupExpenses).values({
+      db.insert(schema.groupExpenses).values({
         id: expenseId,
         tripId,
         payerId,
@@ -35,18 +36,18 @@ export async function POST(request: Request) {
         category: category || 'other',
         splitType: splitType || 'equal',
         createdAt: Date.now()
-      });
+      }),
 
       // 2. Insert individual splits
-      for (const s of splits) {
-        await tx.insert(schema.expenseSplits).values({
+      ...splits.map((s: any) =>
+        db.insert(schema.expenseSplits).values({
           id: generateUUID(),
           expenseId,
           userId: s.userId,
           amount: parseFloat(s.amount)
-        });
-      }
-    });
+        })
+      )
+    ]);
 
     return NextResponse.json({ success: true, expenseId });
   } catch (err: any) {

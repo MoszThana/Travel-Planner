@@ -16,14 +16,14 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Missing items array' }, { status: 400 });
     }
 
-    // Perform bulk updates in a transaction
-    await db.transaction(async (tx: any) => {
-      for (const item of items) {
-        await tx.update(schema.activities)
+    // Bulk update atomically. Cloudflare D1 rejects BEGIN TRANSACTION, so use batch() (works on D1 and libsql)
+    if (items.length > 0) {
+      await db.batch(items.map((item: any) =>
+        db.update(schema.activities)
           .set({ dayId: item.dayId, order: item.order })
-          .where(eq(schema.activities.id, item.id));
-      }
-    });
+          .where(eq(schema.activities.id, item.id))
+      ));
+    }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

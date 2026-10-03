@@ -1,184 +1,192 @@
-.container {
-  padding: 16px;
+/* Weather */
+.alertOk,
+.alertWarn {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.alertOk {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.alertWarn {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.alertOk svg,
+.alertWarn svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.weatherGrid {
+  display: grid;
+  gap: 4px;
+}
+
+.weatherDay {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  animation: fadeIn 0.25s ease;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.title {
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--text);
-}
-
-.sectionCard {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 16px;
-  box-shadow: var(--glass-shadow);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.cardTitle {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text);
-  display: flex;
   align-items: center;
   gap: 6px;
+  padding: 8px 0;
 }
 
-/* Chat bubble styling for AI assistant replies */
-.aiResponse {
-  background: var(--background);
-  border-radius: var(--radius-md);
-  padding: 12px;
-  font-size: 13px;
+.weatherLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.weatherIcon {
+  color: var(--text-muted);
+}
+
+.weatherTemp {
+  font-size: 16px;
+  font-weight: 600;
   color: var(--text);
-  line-height: 1.5;
-  border-left: 4px solid var(--secondary);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Emergency contacts grid */
-.emergencyGrid {
+/* Ask AI */
+.askRow {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.emergencyItem {
-  background: var(--background);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.emgDetails {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.emgName {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.emgRelation {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--primary);
-  text-transform: uppercase;
-}
-
-.emgPhone {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--accent);
-}
-
-/* Voting Hub suggestion cards */
-.suggestionCard {
-  background: var(--background);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
   gap: 8px;
 }
 
+.voteHint {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding-top: 4px;
+}
+
+.suggestionList {
+  display: flex;
+  flex-direction: column;
+}
+
+.suggestionCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 0;
+}
+
+.suggestionCard + .suggestionCard {
+  border-top: 1px solid var(--border);
+}
+
+.suggestionCard:last-child {
+  padding-bottom: 0;
+}
+
 .sugTitle {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .sugDesc {
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 2px;
 }
 
 .voteRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
-  margin-top: 4px;
+  gap: 8px;
 }
 
 .voteButtons {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .voteBtn {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 4px 8px;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: transparent;
   color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  transition: all var(--transition-fast);
 }
 
-.voteBtnActiveUp {
-  background: rgba(34, 197, 94, 0.1);
-  border-color: #22c55e;
-  color: #22c55e;
+.voteBtn:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
 }
 
-.voteBtnActiveDown {
-  background: rgba(244, 63, 94, 0.1);
-  border-color: var(--accent);
+.voteBtnActiveUp,
+.voteBtnActiveUp:hover {
+  background: var(--success-soft);
+  border-color: transparent;
+  color: var(--success);
+}
+
+.voteBtnActiveDown,
+.voteBtnActiveDown:hover {
+  background: var(--accent-soft);
+  border-color: transparent;
   color: var(--accent);
 }
 
-/* Share configurations controls */
+/* Share */
 .shareUrlBox {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: var(--background);
-  padding: 10px;
-  border-radius: var(--radius-sm);
+  gap: 10px;
+  padding: 6px 6px 6px 12px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
+  background: var(--surface-sunken);
+}
+
+.shareIcon {
+  flex-shrink: 0;
+  color: var(--text-faint);
 }
 
 .shareUrlText {
   flex: 1;
-  font-size: 11px;
+  min-width: 0;
+  font-size: 13px;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.copyBtn {
-  background: var(--primary);
-  color: white;
-  border: none;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
+/* Emergency */
+.emgDetails {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.emgNote {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+.emgPhone {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '@/utils/api';
 import { useAuth, UserProfile } from '@/context/AuthContext';
-import styles from './Itinerary.module.css'; // Re-use overlay modal styling from Itinerary
+import { Icon } from './Icon';
 
 interface TripMember {
   id: string;
@@ -105,81 +105,56 @@ export const MembersModal: React.FC<MembersModalProps> = ({
   const isOwner = userRole === 'owner';
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
-      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
-        <h3 className={styles.tripTitle} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          👥 Trip Members
-        </h3>
+    <div className="sheet-overlay" onClick={onClose}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-head">
+          <h2 className="sheet-title">Trip members</h2>
+          <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
+            <Icon name="x" size={18} />
+          </button>
+        </div>
 
         {/* Member List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', margin: '16px 0', maxHeight: '250px', overflowY: 'auto' }}>
+        <div className="list" style={{ maxHeight: '280px', overflowY: 'auto', flexShrink: 0 }}>
           {members.map((member) => (
-            <div
-              key={member.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '10px',
-                border: '1px solid var(--border)',
-                borderRadius: '8px',
-                background: 'var(--background)'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div key={member.id} className="list-row">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={member.avatarUrl}
-                  alt={member.name}
-                  style={{ width: '32px', height: '32px', borderRadius: '50%' }}
-                />
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--text)' }}>
-                    {member.name}
-                  </span>
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                    {member.role.toUpperCase()}
-                  </span>
+                <img src={member.avatarUrl} alt={member.name} className="avatar" />
+                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  <span className="list-title">{member.name}</span>
+                  <span className="list-sub" style={{ textTransform: 'capitalize' }}>{member.role}</span>
                 </div>
               </div>
 
               {/* Owner Access Controls */}
               {isOwner && member.role !== 'owner' ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <select
+                    className="input input-sm"
+                    style={{ width: 'auto' }}
                     value={member.role}
                     onChange={(e) => handleUpdateRole(member.id, e.target.value)}
-                    style={{
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      fontSize: '11px',
-                      background: 'var(--surface)',
-                      border: '1px solid var(--border)',
-                      color: 'var(--text)'
-                    }}
                   >
                     <option value="editor">Editor</option>
                     <option value="viewer">Viewer</option>
                   </select>
                   <button
+                    className="btn-icon danger"
                     onClick={() => handleRemove(member.id)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#ef4444',
-                      cursor: 'pointer',
-                      fontSize: '16px',
-                      padding: '4px'
-                    }}
-                    title="Remove Member"
+                    title="Remove member"
+                    aria-label="Remove member"
                   >
-                    🗑️
+                    <Icon name="trash" size={16} />
                   </button>
                 </div>
-              ) : (
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold', paddingRight: '8px' }}>
-                  {member.role === 'owner' ? '★ Owner' : member.role.toUpperCase()}
+              ) : member.role === 'owner' ? (
+                <span className="chip chip-accent">
+                  <Icon name="star" size={11} strokeWidth={2} />
+                  Owner
                 </span>
+              ) : (
+                <span className="chip" style={{ textTransform: 'capitalize' }}>{member.role}</span>
               )}
             </div>
           ))}
@@ -187,16 +162,14 @@ export const MembersModal: React.FC<MembersModalProps> = ({
 
         {/* Invite Form (only for Trip Owners) */}
         {isOwner && (
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '16px' }}>
-            <h4 style={{ fontSize: '14px', marginBottom: '12px', color: 'var(--text)' }}>Invite Member</h4>
+          <section className="section">
+            <span className="eyebrow">Invite member</span>
             {joinableUsers.length > 0 ? (
-              <form onSubmit={handleInvite} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div className={styles.formGroup}>
-                  <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                    Select Profile
-                  </label>
+              <form onSubmit={handleInvite} className="form">
+                <div className="field">
+                  <label className="label">Profile</label>
                   <select
-                    className={styles.select}
+                    className="input"
                     value={inviteUserId}
                     onChange={(e) => setInviteUserId(e.target.value)}
                   >
@@ -208,46 +181,41 @@ export const MembersModal: React.FC<MembersModalProps> = ({
                   </select>
                 </div>
 
-                <div className={styles.formGroup}>
-                  <label className={styles.dayTab} style={{ background: 'transparent', padding: 0, border: 'none', textAlign: 'left' }}>
-                    Access Level
-                  </label>
+                <div className="field">
+                  <label className="label">Access</label>
                   <select
-                    className={styles.select}
+                    className="input"
                     value={inviteRole}
                     onChange={(e) => setInviteRole(e.target.value as any)}
                   >
-                    <option value="editor">Editor (Can edit activities & days)</option>
-                    <option value="viewer">Viewer (Read-only access)</option>
+                    <option value="editor">Editor — can edit activities and days</option>
+                    <option value="viewer">Viewer — read only</option>
                   </select>
                 </div>
 
-                {error && <div style={{ color: '#ef4444', fontSize: '12px' }}>{error}</div>}
+                {error && <div className="form-error">{error}</div>}
 
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className={styles.addDayBtn}
-                  style={{ background: 'var(--primary)', color: 'white', border: 'none', width: '100%', marginTop: '8px' }}
-                >
-                  {saving ? 'Inviting...' : 'Add to Trip'}
-                </button>
+                <div className="btn-row">
+                  <button type="button" className="btn" onClick={onClose}>
+                    Close
+                  </button>
+                  <button type="submit" disabled={saving} className="btn btn-primary">
+                    {saving ? 'Inviting…' : 'Add to trip'}
+                  </button>
+                </div>
               </form>
             ) : (
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', padding: '8px 0' }}>
-                All available profiles are already members of this trip.
-              </div>
+              <>
+                <p style={{ fontSize: '13px' }}>Everyone with a profile is already on this trip.</p>
+                <button className="btn btn-block" onClick={onClose}>Close</button>
+              </>
             )}
-          </div>
+          </section>
         )}
 
-        <button
-          className={styles.addDayBtn}
-          style={{ width: '100%', marginTop: '16px' }}
-          onClick={onClose}
-        >
-          Close
-        </button>
+        {!isOwner && (
+          <button className="btn btn-block" onClick={onClose}>Close</button>
+        )}
       </div>
     </div>
   );
