@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
 
+export const runtime = 'edge';
+
 // DELETE /api/emergency/[id] - Delete emergency contact
 export async function DELETE(
   request: Request,

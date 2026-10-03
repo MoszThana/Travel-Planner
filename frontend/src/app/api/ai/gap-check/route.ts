@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { queryGemini } from '@/utils/aiHelper';
 
+export const runtime = 'edge';
+
 // POST /api/ai/gap-check - Schedule Gap Detection
 export async function POST(request: Request) {
   try {

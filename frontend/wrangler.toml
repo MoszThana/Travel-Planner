@@ -1,10 +1,8 @@
-name = "travel-planner-frontend"
+name = "travel-planner"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
-main = ".open-next/worker.js"
-
-[assets]
-directory = ".open-next/assets"
+# Cloudflare Pages: next-on-pages writes the deployable site here
+pages_build_output_dir = ".vercel/output/static"
 
 [[d1_databases]]
 binding = "DB"
@@ -15,7 +13,3 @@ migrations_dir = "drizzle/migrations"
 [[r2_buckets]]
 binding = "ATTACHMENTS_BUCKET"
 bucket_name = "travel-planner-attachments"
-
-[alias]
-"@libsql/client/node" = "./src/db/empty-alias.ts"
-"@libsql/isomorphic-ws" = "./src/db/empty-alias.ts"

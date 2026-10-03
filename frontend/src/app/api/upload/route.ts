@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
+import { getRequestContext } from '@cloudflare/next-on-pages';
+
+export const runtime = 'edge';
 
 function generateUUID() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -54,37 +57,15 @@ export async function POST(request: Request) {
     const sanitizedFilename = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
     const storageKey = `${generateUUID()}-${sanitizedFilename}`;
 
-    // 1. Try to fetch R2 bucket binding via OpenNext Cloudflare context
-    let bucket: any = null;
-    try {
-      const { getCloudflareContext } = await import('@opennextjs/cloudflare');
-      const ctx = await getCloudflareContext({ async: true });
-      if (ctx && ctx.env && ctx.env.ATTACHMENTS_BUCKET) {
-        bucket = ctx.env.ATTACHMENTS_BUCKET;
-      }
-    } catch (e) {
-      // Standard Node.js local dev environment
+    // Cloudflare R2 bucket from the Pages binding (local R2 under next dev via setupDevPlatform)
+    const bucket = (getRequestContext().env as any).ATTACHMENTS_BUCKET;
+    if (!bucket) {
+      return NextResponse.json({ error: 'File storage (R2 binding "ATTACHMENTS_BUCKET") is not configured' }, { status: 500 });
     }
 
-    if (bucket) {
-      console.log(`Uploading file ${file.name} to Cloudflare R2...`);
-      await bucket.put(storageKey, arrayBuffer, {
-        httpMetadata: { contentType: file.type }
-      });
-      console.log(`Cloudflare R2 upload successful. Key: ${storageKey}`);
-    } else {
-      // 2. Fallback to local file system writing
-      console.log(`No R2 bucket found. Writing file ${file.name} to local uploads/ directory...`);
-      const fs = eval("require('fs')");
-      const path = eval("require('path')");
-      const uploadsDir = path.join(process.cwd(), 'uploads');
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
-      }
-      const filePath = path.join(uploadsDir, storageKey);
-      fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
-      console.log(`Local file write successful: ${filePath}`);
-    }
+    await bucket.put(storageKey, arrayBuffer, {
+      httpMetadata: { contentType: file.type }
+    });
 
     const fileUrl = `/api/attachments/${storageKey}`;
     const attachmentId = generateUUID();

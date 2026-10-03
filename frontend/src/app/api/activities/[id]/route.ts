@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
 
+export const runtime = 'edge';
+
 // PUT /api/activities/[id] - Edit activity
 export async function PUT(
   request: Request,

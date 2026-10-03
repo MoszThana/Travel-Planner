@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
 
+export const runtime = 'edge';
+
 // POST /api/users/login - Login with userId and 4-digit PIN
 export async function POST(request: Request) {
   try {
