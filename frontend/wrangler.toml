@@ -1,4 +1,4 @@
-name = "travel-planner"
+name = "easytripplanner"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 # Cloudflare Pages: next-on-pages writes the deployable site here
