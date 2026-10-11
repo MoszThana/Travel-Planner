@@ -2,27 +2,24 @@ import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
 import { getRequestContext } from '@cloudflare/next-on-pages';
+import { requireUser, requireTripRole, tripIdForActivity, errorResponse } from '@/lib/access';
 
 export const runtime = 'edge';
 
-function generateUUID() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-}
+const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20 MB
 
-// GET /api/upload?tripId=... - List attachments for a trip
+// GET /api/upload?tripId=... - List attachments for a trip (trip members)
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const tripId = searchParams.get('tripId');
-
-  if (!tripId) {
-    return NextResponse.json({ error: 'Missing tripId parameter' }, { status: 400 });
-  }
-
   try {
+    const userId = await requireUser(request);
+    const { searchParams } = new URL(request.url);
+    const tripId = searchParams.get('tripId');
+    if (!tripId) {
+      return NextResponse.json({ error: 'Missing tripId parameter' }, { status: 400 });
+    }
+
     const db = await getSafeDb();
+    await requireTripRole(db, tripId, userId, 'viewer');
 
     const list = await db.select()
       .from(schema.attachments)
@@ -30,32 +27,45 @@ export async function GET(request: Request) {
       .orderBy(schema.attachments.createdAt);
 
     return NextResponse.json(list);
-  } catch (err: any) {
-    console.error('Error listing attachments:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    return errorResponse(err, 'Error listing attachments:');
   }
 }
 
-// POST /api/upload - Upload file to R2 or write to local uploads/ folder
+// POST /api/upload - Upload a file to R2 (trip editors)
 export async function POST(request: Request) {
   try {
+    const userId = await requireUser(request);
     const db = await getSafeDb();
+
+    // Reject oversized uploads before reading the body (form overhead allowance: 1 MB)
+    const declaredBytes = Number(request.headers.get('content-length') || 0);
+    if (declaredBytes > MAX_FILE_BYTES + 1024 * 1024) {
+      return NextResponse.json({ error: 'File is too large (max 20 MB).' }, { status: 413 });
+    }
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const tripId = formData.get('tripId') as string;
     const activityId = formData.get('activityId') as string || null;
-    const uploadedBy = formData.get('uploadedBy') as string || 'user-maru';
 
     if (!file || !tripId) {
       return NextResponse.json({ error: 'Missing file or tripId' }, { status: 400 });
     }
+    await requireTripRole(db, tripId, userId, 'editor');
+
+    if (activityId && (await tripIdForActivity(db, activityId)) !== tripId) {
+      return NextResponse.json({ error: 'That activity belongs to a different trip.' }, { status: 400 });
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      return NextResponse.json({ error: 'File is too large (max 20 MB).' }, { status: 413 });
+    }
 
     const arrayBuffer = await file.arrayBuffer();
-    
+
     // Generate a unique, safe storage key/filename
     const sanitizedFilename = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-    const storageKey = `${generateUUID()}-${sanitizedFilename}`;
+    const storageKey = `${crypto.randomUUID()}-${sanitizedFilename}`;
 
     // Cloudflare R2 bucket from the Pages binding (local R2 under next dev via setupDevPlatform)
     const bucket = (getRequestContext().env as any).ATTACHMENTS_BUCKET;
@@ -68,19 +78,18 @@ export async function POST(request: Request) {
     });
 
     const fileUrl = `/api/attachments/${storageKey}`;
-    const attachmentId = generateUUID();
+    const attachmentId = crypto.randomUUID();
 
-    // Insert attachment record into database
     await db.insert(schema.attachments).values({
       id: attachmentId,
       tripId,
       activityId,
       name: file.name,
       fileUrl,
-      oneDriveItemId: storageKey, // We repurpose this string field to hold R2 storage key / filename
+      oneDriveItemId: storageKey, // holds the R2 storage key
       fileSize: file.size,
       mimeType: file.type,
-      uploadedBy,
+      uploadedBy: userId,
       createdAt: Date.now()
     });
 
@@ -90,9 +99,7 @@ export async function POST(request: Request) {
       name: file.name,
       fileUrl
     });
-  } catch (err: any) {
-    console.error('R2 / Local upload api handler failed:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    return errorResponse(err, 'R2 upload failed:');
   }
 }
-

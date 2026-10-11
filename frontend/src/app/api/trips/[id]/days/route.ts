@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
+import { requireUser, requireTripRole, errorResponse } from '@/lib/access';
 
 export const runtime = 'edge';
 
@@ -20,8 +21,9 @@ export async function POST(
   const { id } = await params;
 
   try {
-    
+    const userId = await requireUser(request);
     const db = await getSafeDb();
+    await requireTripRole(db, id, userId, 'editor');
 
     const existingDays = await db.select().from(schema.days).where(eq(schema.days.tripId, id)).orderBy(schema.days.dayNumber);
     const newDayNum = existingDays.length + 1;
@@ -45,8 +47,7 @@ export async function POST(
     await db.update(schema.trips).set({ endDate: nextDate.getTime() }).where(eq(schema.trips.id, id));
 
     return NextResponse.json({ success: true, dayId, dayNumber: newDayNum });
-  } catch (err: any) {
-    console.error(`Error adding day to trip ${id}:`, err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    return errorResponse(err, `Error adding day to trip ${id}:`);
   }
 }

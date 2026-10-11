@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq, inArray } from 'drizzle-orm';
+import { requireUser, requireTripRole, errorResponse } from '@/lib/access';
 
 export const runtime = 'edge';
 
@@ -12,8 +13,9 @@ export async function GET(
   const { id } = await params;
 
   try {
-    
+    const userId = await requireUser(request);
     const db = await getSafeDb();
+    await requireTripRole(db, id, userId, 'viewer');
 
     const tripRows = await db.select().from(schema.trips).where(eq(schema.trips.id, id));
     if (tripRows.length === 0) {
@@ -69,8 +71,7 @@ export async function GET(
       emergency,
       votes
     });
-  } catch (err: any) {
-    console.error(`Error fetching trip ${id}:`, err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    return errorResponse(err, `Error fetching trip ${id}:`);
   }
 }

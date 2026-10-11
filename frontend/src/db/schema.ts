@@ -6,7 +6,9 @@ export const users = sqliteTable('users', {
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
   avatarUrl: text('avatar_url'),
-  pin: text('pin'), // 4-digit pin password
+  pin: text('pin'), // PBKDF2 hash of the 4-digit PIN (legacy rows: plain PIN, upgraded on next login)
+  failedAttempts: integer('failed_attempts').notNull().default(0),
+  lockedUntil: integer('locked_until'), // ms timestamp; login refused until then
   createdAt: integer('created_at').notNull(),
 });
 

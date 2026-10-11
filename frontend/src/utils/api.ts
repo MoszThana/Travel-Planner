@@ -11,6 +11,10 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}): P
       },
     });
     if (!res.ok) {
+      // Session expired or missing: let AuthContext send the user back to login
+      if (res.status === 401 && typeof window !== 'undefined' && !endpoint.startsWith('/users/login')) {
+        window.dispatchEvent(new Event('auth:expired'));
+      }
       const err = await res.json().catch(() => ({})) as any;
       throw new Error(err.error || `HTTP error! status: ${res.status}`);
     }

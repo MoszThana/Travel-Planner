@@ -1,29 +1,23 @@
-
 import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
+import { requireUser, requireTripRole, tripIdForDay, errorResponse } from '@/lib/access';
 
 export const runtime = 'edge';
 
-function generateUUID() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-}
-
-// POST /api/activities - Add activity
+// POST /api/activities - Add activity (trip editors)
 export async function POST(request: Request) {
   try {
-    
+    const userId = await requireUser(request);
     const db = await getSafeDb();
     const body = await request.json() as any;
     const { dayId, name, time, notes, location, lat, lng, transportType, estCost, actCost, costCategory, order } = body;
-    
+
     if (!dayId || !name) {
       return NextResponse.json({ error: 'Missing dayId or name' }, { status: 400 });
     }
+    await requireTripRole(db, await tripIdForDay(db, dayId), userId, 'editor');
 
-    const activityId = generateUUID();
+    const activityId = crypto.randomUUID();
     await db.insert(schema.activities).values({
       id: activityId,
       dayId,
@@ -42,10 +36,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ success: true, activityId });
-  } catch (err: any) {
-    console.error('Error adding activity:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    return errorResponse(err, 'Error adding activity:');
   }
 }
-
-

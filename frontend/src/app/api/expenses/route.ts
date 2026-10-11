@@ -1,34 +1,37 @@
-
 import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
+import { eq } from 'drizzle-orm';
+import { requireUser, requireTripRole, errorResponse } from '@/lib/access';
 
 export const runtime = 'edge';
 
-function generateUUID() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-}
-
-// POST /api/expenses - Add group expense and splits
+// POST /api/expenses - Add group expense and splits (trip editors)
 export async function POST(request: Request) {
   try {
-    
+    const userId = await requireUser(request);
     const db = await getSafeDb();
 
     const body = await request.json() as any;
     const { tripId, payerId, amount, description, category, splitType, splits } = body;
-    
-    if (!tripId || !payerId || !amount || !description || !splits || !Array.isArray(splits)) {
+
+    if (!tripId || !payerId || !amount || !description || !splits || !Array.isArray(splits) || splits.length === 0) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
+    await requireTripRole(db, tripId, userId, 'editor');
 
-    const expenseId = generateUUID();
+    // The payer and everyone sharing the cost must be on this trip
+    const memberRows = await db.select({ userId: schema.tripMembers.userId })
+      .from(schema.tripMembers)
+      .where(eq(schema.tripMembers.tripId, tripId));
+    const members = new Set(memberRows.map((m: { userId: string }) => m.userId));
+    if (!members.has(payerId) || splits.some((s: any) => !members.has(s.userId))) {
+      return NextResponse.json({ error: 'Payer and people sharing the cost must be trip members.' }, { status: 400 });
+    }
+
+    const expenseId = crypto.randomUUID();
 
     // Insert the expense and its splits atomically. Cloudflare D1 rejects BEGIN TRANSACTION, so use batch()
     await db.batch([
-      // 1. Insert Group Expense
       db.insert(schema.groupExpenses).values({
         id: expenseId,
         tripId,
@@ -39,11 +42,9 @@ export async function POST(request: Request) {
         splitType: splitType || 'equal',
         createdAt: Date.now()
       }),
-
-      // 2. Insert individual splits
       ...splits.map((s: any) =>
         db.insert(schema.expenseSplits).values({
-          id: generateUUID(),
+          id: crypto.randomUUID(),
           expenseId,
           userId: s.userId,
           amount: parseFloat(s.amount)
@@ -52,10 +53,7 @@ export async function POST(request: Request) {
     ]);
 
     return NextResponse.json({ success: true, expenseId });
-  } catch (err: any) {
-    console.error('Error adding expense:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    return errorResponse(err, 'Error adding expense:');
   }
 }
-
-

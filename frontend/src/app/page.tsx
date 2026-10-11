@@ -14,7 +14,7 @@ import { LoginView } from '@/components/LoginView';
 import { apiRequest, getOfflineTrips, saveOfflineTrips } from '@/utils/api';
 
 export default function Home() {
-  const { user } = useAuth();
+  const { user, authLoading } = useAuth();
   const [trips, setTrips] = useState<any[]>([]);
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('home');
@@ -26,7 +26,7 @@ export default function Home() {
   const loadTrips = useCallback(async () => {
     if (!user) return;
     try {
-      const data = await apiRequest(`/trips?userId=${user.id}`) as any[];
+      const data = await apiRequest('/trips') as any[];
       setTrips(data);
       // Sync offline cache
       saveOfflineTrips(data);
@@ -157,6 +157,10 @@ export default function Home() {
         return null;
     }
   };
+
+  if (authLoading) {
+    return <div className="empty">Loading…</div>;
+  }
 
   if (!user) {
     return <LoginView />;

@@ -1,124 +1,98 @@
-
 import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
+import { requireUser, errorResponse } from '@/lib/access';
 
 export const runtime = 'edge';
 
-function generateUUID() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-}
-
-// GET /api/trips - List trips for a user (or all trips if no userId provided)
+// GET /api/trips - Trips the logged-in user belongs to
 export async function GET(request: Request) {
   try {
+    const userId = await requireUser(request);
     const db = await getSafeDb();
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
 
-    let list;
-    if (userId) {
-      const rows = await db.select({
-        id: schema.trips.id,
-        name: schema.trips.name,
-        destination: schema.trips.destination,
-        startDate: schema.trips.startDate,
-        endDate: schema.trips.endDate,
-        ownerId: schema.trips.ownerId,
-        createdAt: schema.trips.createdAt,
-        role: schema.tripMembers.role
-      })
-        .from(schema.trips)
-        .innerJoin(schema.tripMembers, eq(schema.trips.id, schema.tripMembers.tripId))
-        .where(eq(schema.tripMembers.userId, userId))
-        .orderBy(schema.trips.createdAt);
-      
-      list = rows;
-    } else {
-      list = await db.select().from(schema.trips).orderBy(schema.trips.createdAt);
-    }
+    const list = await db.select({
+      id: schema.trips.id,
+      name: schema.trips.name,
+      destination: schema.trips.destination,
+      startDate: schema.trips.startDate,
+      endDate: schema.trips.endDate,
+      ownerId: schema.trips.ownerId,
+      createdAt: schema.trips.createdAt,
+      role: schema.tripMembers.role
+    })
+      .from(schema.trips)
+      .innerJoin(schema.tripMembers, eq(schema.trips.id, schema.tripMembers.tripId))
+      .where(eq(schema.tripMembers.userId, userId))
+      .orderBy(schema.trips.createdAt);
+
     return NextResponse.json(list);
-  } catch (err: any) {
-    console.error('Error fetching trips:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    return errorResponse(err, 'Error fetching trips:');
   }
 }
 
-// POST /api/trips - Create a new trip
+// POST /api/trips - Create a trip owned by the logged-in user
 export async function POST(request: Request) {
   try {
-    
+    const userId = await requireUser(request);
     const db = await getSafeDb();
-    
 
     const body = await request.json() as any;
-    const { name, destination, startDate, endDate, ownerId } = body;
-    
-    if (!name || !destination || !startDate || !endDate || !ownerId) {
+    const { name, destination, startDate, endDate } = body;
+
+    if (!name || !destination || !startDate || !endDate) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const tripId = generateUUID();
-
-    // Ensure the owner user exists in the database to prevent foreign key errors
-    try {
-      await db.insert(schema.users).values({
-        id: ownerId,
-        name: ownerId.replace('user-', ''),
-        email: `${ownerId.replace('user-', '')}@example.com`,
-        createdAt: Date.now()
-      }).onConflictDoNothing();
-    } catch (e) {
-      // Ignore
-    }
-
-    // 1. Insert Trip
-    await db.insert(schema.trips).values({
-      id: tripId,
-      name,
-      destination,
-      startDate: Number(startDate),
-      endDate: Number(endDate),
-      ownerId,
-      createdAt: Date.now()
-    });
-
-    // 2. Add owner as the first member
-    await db.insert(schema.tripMembers).values({
-      id: generateUUID(),
-      tripId,
-      userId: ownerId,
-      role: 'owner',
-      joinedAt: Date.now()
-    });
-
-
-
-    // 3. Generate Day slots based on date range
     const start = new Date(Number(startDate));
     const end = new Date(Number(endDate));
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-
-    for (let i = 1; i <= diffDays; i++) {
-      const dayDate = new Date(start);
-      dayDate.setDate(start.getDate() + (i - 1));
-      await db.insert(schema.days).values({
-        id: generateUUID(),
-        tripId,
-        dayNumber: i,
-        date: dayDate.getTime()
-      });
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) {
+      return NextResponse.json({ error: 'End date cannot be before start date.' }, { status: 400 });
     }
 
+    const diffDays = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    if (diffDays > 60) {
+      return NextResponse.json({ error: 'Trips can be at most 60 days long.' }, { status: 400 });
+    }
+
+    const tripId = crypto.randomUUID();
+    const now = Date.now();
+
+    // Trip, owner membership and day slots in one atomic batch
+    const dayInserts = Array.from({ length: diffDays }, (_, i) => {
+      const dayDate = new Date(start);
+      dayDate.setDate(start.getDate() + i);
+      return db.insert(schema.days).values({
+        id: crypto.randomUUID(),
+        tripId,
+        dayNumber: i + 1,
+        date: dayDate.getTime()
+      });
+    });
+
+    await db.batch([
+      db.insert(schema.trips).values({
+        id: tripId,
+        name,
+        destination,
+        startDate: start.getTime(),
+        endDate: end.getTime(),
+        ownerId: userId,
+        createdAt: now
+      }),
+      db.insert(schema.tripMembers).values({
+        id: crypto.randomUUID(),
+        tripId,
+        userId,
+        role: 'owner',
+        joinedAt: now
+      }),
+      ...dayInserts
+    ]);
+
     return NextResponse.json({ success: true, tripId });
-  } catch (err: any) {
-    console.error('Error creating trip:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    return errorResponse(err, 'Error creating trip:');
   }
 }
-
-

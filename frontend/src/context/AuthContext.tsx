@@ -1,21 +1,22 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { apiRequest } from '@/utils/api';
 
 export interface UserProfile {
   id: string;
   name: string;
-  email: string;
+  email?: string; // only returned to logged-in users
   avatarUrl?: string;
 }
 
 interface AuthContextType {
   user: UserProfile | null;
+  authLoading: boolean;
   allUsers: UserProfile[];
   loginWithPin: (userId: string, pin: string) => Promise<{ success: boolean; error?: string }>;
   createProfile: (name: string, email: string, pin: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshProfiles: () => Promise<void>;
 }
 
@@ -23,26 +24,45 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
 
-  const refreshProfiles = async () => {
+  // Stable identity: LoginView re-runs its effect when this changes
+  const refreshProfiles = useCallback(async () => {
     try {
       const data = await apiRequest('/users') as UserProfile[];
       setAllUsers(data || []);
     } catch (err) {
       console.error('Failed to load user profiles from backend:', err);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    refreshProfiles();
-
+    // The session lives in an HttpOnly cookie; ask the server who we are
     if (typeof window !== 'undefined') {
-      const savedUser = localStorage.getItem('user_profile');
-      if (savedUser) {
-        setUser(JSON.parse(savedUser));
-      }
+      localStorage.removeItem('user_profile'); // leftover from the old browser-only login
     }
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+        if (res.ok) {
+          const data = await res.json() as { user: UserProfile };
+          setUser(data.user);
+        }
+      } catch (err) {
+        console.error('Failed to check login session:', err);
+      } finally {
+        setAuthLoading(false);
+      }
+      refreshProfiles();
+    })();
+  }, [refreshProfiles]);
+
+  // Any API call answered with 401 means the session is gone
+  useEffect(() => {
+    const onExpired = () => setUser(null);
+    window.addEventListener('auth:expired', onExpired);
+    return () => window.removeEventListener('auth:expired', onExpired);
   }, []);
 
   const loginWithPin = async (userId: string, pin: string) => {
@@ -54,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (res && res.success && res.user) {
         setUser(res.user);
-        localStorage.setItem('user_profile', JSON.stringify(res.user));
+        refreshProfiles();
         return { success: true };
       }
       return { success: false, error: res?.error || 'Authentication failed' };
@@ -71,9 +91,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }) as any;
 
       if (res && res.success && res.user) {
-        await refreshProfiles();
         setUser(res.user);
-        localStorage.setItem('user_profile', JSON.stringify(res.user));
+        await refreshProfiles();
         return { success: true };
       }
       return { success: false, error: res?.error || 'Failed to create profile' };
@@ -82,13 +101,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await apiRequest('/auth/logout', { method: 'POST' });
+    } catch (err) {
+      console.error('Logout request failed:', err);
+    }
     setUser(null);
-    localStorage.removeItem('user_profile');
+    refreshProfiles();
   };
 
   return (
-    <AuthContext.Provider value={{ user, allUsers, loginWithPin, createProfile, logout, refreshProfiles }}>
+    <AuthContext.Provider value={{ user, authLoading, allUsers, loginWithPin, createProfile, logout, refreshProfiles }}>
       {children}
     </AuthContext.Provider>
   );

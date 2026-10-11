@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server';
+import { requireUser, errorResponse } from '@/lib/access';
 
 export const runtime = 'edge';
 
 // GET /api/weather - Fetch real weather or fallback to mock weather
 export async function GET(request: Request) {
+  try {
+    await requireUser(request);
+  } catch (err) {
+    return errorResponse(err, 'Weather auth:');
+  }
+
   const { searchParams } = new URL(request.url);
   const lat = searchParams.get('lat');
   const lng = searchParams.get('lng');

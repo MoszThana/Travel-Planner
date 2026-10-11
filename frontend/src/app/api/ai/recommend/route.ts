@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { queryGemini } from '@/utils/aiHelper';
+import { requireUser, errorResponse } from '@/lib/access';
 
 export const runtime = 'edge';
 
 // POST /api/ai/recommend - Nearby recommendations based on active location and weather
 export async function POST(request: Request) {
   try {
+    await requireUser(request);
     const body = await request.json() as any;
     const { destination, activityName, weather } = body;
 
@@ -25,9 +27,8 @@ Return ONLY a JSON array. Example:
 
     const results = await queryGemini(prompt, mockRecommendations);
     return NextResponse.json(results);
-  } catch (err: any) {
-    console.error('Error in recommend AI API:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    return errorResponse(err, 'Error in recommend API:');
   }
 }
 

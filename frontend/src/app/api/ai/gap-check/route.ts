@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { queryGemini } from '@/utils/aiHelper';
+import { requireUser, errorResponse } from '@/lib/access';
 
 export const runtime = 'edge';
 
 // POST /api/ai/gap-check - Schedule Gap Detection
 export async function POST(request: Request) {
   try {
+    await requireUser(request);
     const body = await request.json() as any;
     const { activities } = body;
     
@@ -65,9 +67,8 @@ Return ONLY a JSON array of issues. Example format:
 
     const results = await queryGemini(prompt, mockIssues);
     return NextResponse.json(results);
-  } catch (err: any) {
-    console.error('Error in gap-check AI API:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    return errorResponse(err, 'Error in gap-check API:');
   }
 }
 

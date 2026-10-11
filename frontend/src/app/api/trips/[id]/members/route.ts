@@ -1,105 +1,90 @@
 import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq, and } from 'drizzle-orm';
+import { requireUser, requireTripRole, errorResponse } from '@/lib/access';
 
 export const runtime = 'edge';
 
-function generateUUID() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return 'tmem-' + Math.random().toString(36).substring(2, 15);
-}
+const ASSIGNABLE_ROLES = ['editor', 'viewer'];
 
-// POST /api/trips/[id]/members - Invite or update a member's role
+// POST /api/trips/[id]/members - Owner invites a member or changes their role
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: tripId } = await params;
   try {
+    const currentUserId = await requireUser(request);
     const db = await getSafeDb();
-    const body = await request.json() as any;
-    const { userId, role } = body; // role: 'editor' | 'viewer'
+    await requireTripRole(db, tripId, currentUserId, 'owner');
 
-    if (!userId || !role) {
-      return NextResponse.json({ error: 'Missing userId or role' }, { status: 400 });
+    const body = await request.json() as any;
+    const { userId, role } = body;
+
+    if (!userId || !ASSIGNABLE_ROLES.includes(role)) {
+      return NextResponse.json({ error: 'Choose a profile and a role (editor or viewer).' }, { status: 400 });
     }
 
-    // Check if user exists
-    const userCheck = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+    const tripRows = await db.select({ ownerId: schema.trips.ownerId }).from(schema.trips).where(eq(schema.trips.id, tripId)).limit(1);
+    if (tripRows[0]?.ownerId === userId) {
+      return NextResponse.json({ error: "The owner's role can't be changed." }, { status: 400 });
+    }
+
+    const userCheck = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.id, userId)).limit(1);
     if (userCheck.length === 0) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
     }
 
-    // Check if already a member
-    const existing = await db.select()
+    const existing = await db.select({ id: schema.tripMembers.id })
       .from(schema.tripMembers)
-      .where(
-        and(
-          eq(schema.tripMembers.tripId, tripId),
-          eq(schema.tripMembers.userId, userId)
-        )
-      )
+      .where(and(eq(schema.tripMembers.tripId, tripId), eq(schema.tripMembers.userId, userId)))
       .limit(1);
 
     if (existing.length > 0) {
-      // Update role
-      await db.update(schema.tripMembers)
-        .set({ role })
-        .where(eq(schema.tripMembers.id, existing[0].id));
-      
+      await db.update(schema.tripMembers).set({ role }).where(eq(schema.tripMembers.id, existing[0].id));
       return NextResponse.json({ success: true, updated: true });
-    } else {
-      // Add new member
-      await db.insert(schema.tripMembers).values({
-        id: generateUUID(),
-        tripId,
-        userId,
-        role,
-        joinedAt: Date.now()
-      });
-
-      return NextResponse.json({ success: true, added: true });
     }
-  } catch (err: any) {
-    console.error('Error managing trip member:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+
+    await db.insert(schema.tripMembers).values({
+      id: crypto.randomUUID(),
+      tripId,
+      userId,
+      role,
+      joinedAt: Date.now()
+    });
+    return NextResponse.json({ success: true, added: true });
+  } catch (err) {
+    return errorResponse(err, 'Error managing trip member:');
   }
 }
 
-// DELETE /api/trips/[id]/members - Remove a member from the trip
+// DELETE /api/trips/[id]/members?userId=... - Owner removes a member
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: tripId } = await params;
   try {
+    const currentUserId = await requireUser(request);
     const db = await getSafeDb();
+    await requireTripRole(db, tripId, currentUserId, 'owner');
+
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
-
     if (!userId) {
       return NextResponse.json({ error: 'Missing userId parameter' }, { status: 400 });
     }
 
-    // Check if it's the owner trying to be deleted (owners cannot be removed from their own trips)
-    const tripRows = await db.select().from(schema.trips).where(eq(schema.trips.id, tripId)).limit(1);
-    if (tripRows.length > 0 && tripRows[0].ownerId === userId) {
+    const tripRows = await db.select({ ownerId: schema.trips.ownerId }).from(schema.trips).where(eq(schema.trips.id, tripId)).limit(1);
+    if (tripRows[0]?.ownerId === userId) {
       return NextResponse.json({ error: 'Cannot remove the owner of the trip' }, { status: 400 });
     }
 
     await db.delete(schema.tripMembers)
-      .where(
-        and(
-          eq(schema.tripMembers.tripId, tripId),
-          eq(schema.tripMembers.userId, userId)
-        )
-      );
+      .where(and(eq(schema.tripMembers.tripId, tripId), eq(schema.tripMembers.userId, userId)));
 
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    console.error('Error removing trip member:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    return errorResponse(err, 'Error removing trip member:');
   }
 }

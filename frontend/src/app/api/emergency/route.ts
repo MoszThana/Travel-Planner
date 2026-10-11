@@ -1,20 +1,13 @@
-
 import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
+import { requireUser, requireTripRole, errorResponse } from '@/lib/access';
 
 export const runtime = 'edge';
 
-function generateUUID() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-}
-
-// POST /api/emergency - Add emergency contact
+// POST /api/emergency - Add emergency contact (trip editors)
 export async function POST(request: Request) {
   try {
-    
+    const userId = await requireUser(request);
     const db = await getSafeDb();
 
     const body = await request.json() as any;
@@ -23,8 +16,9 @@ export async function POST(request: Request) {
     if (!tripId || !name || !relation || !phone) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
+    await requireTripRole(db, tripId, userId, 'editor');
 
-    const id = generateUUID();
+    const id = crypto.randomUUID();
     await db.insert(schema.emergencyContacts).values({
       id,
       tripId,
@@ -35,10 +29,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ success: true, id });
-  } catch (err: any) {
-    console.error('Error adding emergency contact:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    return errorResponse(err, 'Error adding emergency contact:');
   }
 }
-
-

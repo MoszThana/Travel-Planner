@@ -1,29 +1,24 @@
-
 import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { and, eq } from 'drizzle-orm';
+import { requireUser, requireTripRole, errorResponse } from '@/lib/access';
 
 export const runtime = 'edge';
 
-function generateUUID() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-}
-
-// POST /api/votes - Cast or toggle vote
+// POST /api/votes - Like/dislike an item; always cast as the logged-in user (any trip member)
 export async function POST(request: Request) {
   try {
-    
+    const userId = await requireUser(request);
     const db = await getSafeDb();
 
     const body = await request.json() as any;
-    const { tripId, itemId, itemType, userId, voteType } = body;
+    const { tripId, itemId, itemType } = body;
+    const voteType = Number(body.voteType);
 
-    if (!tripId || !itemId || !itemType || !userId || voteType === undefined) {
+    if (!tripId || !itemId || !itemType || (voteType !== 1 && voteType !== -1)) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
+    await requireTripRole(db, tripId, userId, 'viewer');
 
     const existing = await db.select().from(schema.votes).where(
       and(
@@ -34,30 +29,26 @@ export async function POST(request: Request) {
     );
 
     if (existing.length > 0) {
-      if (existing[0].voteType === Number(voteType)) {
+      if (existing[0].voteType === voteType) {
         // Toggle off if clicking the same vote again
         await db.delete(schema.votes).where(eq(schema.votes.id, existing[0].id));
       } else {
-        // Update vote type
-        await db.update(schema.votes).set({ voteType: Number(voteType) }).where(eq(schema.votes.id, existing[0].id));
+        await db.update(schema.votes).set({ voteType }).where(eq(schema.votes.id, existing[0].id));
       }
     } else {
       await db.insert(schema.votes).values({
-        id: generateUUID(),
+        id: crypto.randomUUID(),
         tripId,
         itemId,
         itemType,
         userId,
-        voteType: Number(voteType),
+        voteType,
         createdAt: Date.now()
       });
     }
 
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    console.error('Error casting vote:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    return errorResponse(err, 'Error casting vote:');
   }
 }
-
-

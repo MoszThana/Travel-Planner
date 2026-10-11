@@ -12,30 +12,8 @@ export function getDb(env?: any) {
   return drizzle(binding, { schema });
 }
 
-let seeded = false;
-
 export async function getSafeDb() {
-  const db = getDb();
-
-  // Seed mock users once per worker instance to prevent Foreign Key failures during prototype testing
-  if (!seeded) {
-    seeded = true;
-    try {
-      const now = Date.now();
-      await db.batch(
-        [
-          { id: 'user-maru', name: 'Maru', email: 'maru@example.com', avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Maru', createdAt: now },
-          { id: 'user-somchai', name: 'Somchai', email: 'somchai@example.com', avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Somchai', createdAt: now },
-          { id: 'user-jane', name: 'Jane', email: 'jane@example.com', avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Jane', createdAt: now },
-          { id: 'user-david', name: 'David', email: 'david@example.com', avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=David', createdAt: now },
-        ].map((u) => db.insert(schema.users).values(u).onConflictDoNothing()) as any
-      );
-    } catch (err) {
-      // Ignore seeding errors (e.g. tables not migrated yet)
-    }
-  }
-
-  return db;
+  return getDb();
 }
 
 export * as schema from './schema';

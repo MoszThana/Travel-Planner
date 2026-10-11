@@ -1,11 +1,11 @@
-
 import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
+import { requireUser, requireTripRole, tripIdForExpense, errorResponse } from '@/lib/access';
 
 export const runtime = 'edge';
 
-// DELETE /api/expenses/[id] - Delete expense and its splits
+// DELETE /api/expenses/[id] - Delete expense and its splits (trip editors)
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -13,8 +13,9 @@ export async function DELETE(
   const { id } = await params;
 
   try {
-    
+    const userId = await requireUser(request);
     const db = await getSafeDb();
+    await requireTripRole(db, await tripIdForExpense(db, id), userId, 'editor');
 
     // Delete splits then the expense atomically. Cloudflare D1 rejects BEGIN TRANSACTION, so use batch()
     await db.batch([
@@ -23,8 +24,7 @@ export async function DELETE(
     ]);
 
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    console.error(`Error deleting expense ${id}:`, err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    return errorResponse(err, `Error deleting expense ${id}:`);
   }
 }
