@@ -11,10 +11,18 @@ export type TripRole = 'viewer' | 'editor' | 'owner';
 const RANK: Record<TripRole, number> = { viewer: 1, editor: 2, owner: 3 };
 
 export class HttpError extends Error {
+  readonly isHttpError = true;
   constructor(public status: number, message: string) {
     super(message);
+    // Keep the prototype when the build down-levels classes that extend Error
+    Object.setPrototypeOf(this, HttpError.prototype);
   }
 }
+
+// Brand check instead of instanceof: in the Cloudflare production bundle the
+// error can come from a different copy of this class, so instanceof fails.
+const isHttpError = (err: unknown): err is HttpError =>
+  typeof err === 'object' && err !== null && (err as any).isHttpError === true && typeof (err as any).status === 'number';
 
 /** The logged-in user's id, or a 401. */
 export async function requireUser(request: Request): Promise<string> {
@@ -73,7 +81,7 @@ export async function tripIdForAttachmentKey(db: any, storageKey: string): Promi
 
 /** Turn a thrown error into a JSON response (HttpError keeps its status). */
 export function errorResponse(err: unknown, context: string) {
-  if (err instanceof HttpError) {
+  if (isHttpError(err)) {
     return NextResponse.json({ error: err.message }, { status: err.status });
   }
   console.error(context, err);
