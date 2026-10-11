@@ -2,10 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/context/TranslationContext';
+import { apiRequest, showError } from '@/utils/api';
+import { formatMoney, CURRENCIES } from '@/utils/money';
 import styles from './BudgetTracker.module.css';
 
 interface BudgetTrackerProps {
   trip: any;
+  onRefresh: () => void;
   userRole?: string;
 }
 
@@ -19,25 +22,42 @@ const CATEGORY_COLORS: Record<string, string> = {
   other: 'var(--cat-other)'
 };
 
-export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, userRole = 'editor' }) => {
-  const { t } = useTranslation();
-  const [targetBudget, setTargetBudget] = useState(50000); // Default target budget
+export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, onRefresh, userRole = 'editor' }) => {
+  const { t, locale } = useTranslation();
+  const canEdit = userRole === 'owner' || userRole === 'editor';
+  const currency = trip.currency || 'THB';
+  const money = (value: number) => formatMoney(value, currency, locale);
+
+  // Budget target is shared by the whole group (saved on the trip)
+  const targetBudget: number = trip.budget ?? 0;
+  const [budgetInput, setBudgetInput] = useState(trip.budget != null ? String(trip.budget) : '');
+  const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(`budget_target_${trip.id}`);
-      if (saved) {
-        setTargetBudget(parseFloat(saved));
-      }
-    }
-  }, [trip.id]);
+    setBudgetInput(trip.budget != null ? String(trip.budget) : '');
+  }, [trip.budget]);
 
-  const handleTargetChange = (val: string) => {
-    const num = parseFloat(val) || 0;
-    setTargetBudget(num);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(`budget_target_${trip.id}`, String(num));
+  const saveSettings = async (updates: { budget?: number | null; currency?: string }) => {
+    setSavingSettings(true);
+    try {
+      await apiRequest(`/trips/${trip.id}`, { method: 'PATCH', body: JSON.stringify(updates) });
+      onRefresh();
+    } catch (err) {
+      showError(err, "Couldn't save the budget.");
+      setBudgetInput(trip.budget != null ? String(trip.budget) : '');
+    } finally {
+      setSavingSettings(false);
     }
+  };
+
+  const commitBudget = () => {
+    const value = budgetInput.trim() === '' ? null : Number(budgetInput);
+    if (value === (trip.budget ?? null)) return;
+    if (value !== null && (!Number.isFinite(value) || value < 0)) {
+      setBudgetInput(trip.budget != null ? String(trip.budget) : '');
+      return;
+    }
+    saveSettings({ budget: value });
   };
 
   // 1. Calculate Activity Totals
@@ -78,16 +98,32 @@ export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, userRole = '
 
   const costPerDay = totalAct / daysCount;
   const costPerPerson = totalAct / membersCount;
+  const hasBudget = targetBudget > 0;
   const remaining = targetBudget - totalAct;
-  const isOverBudget = remaining < 0;
-  
+  const isOverBudget = hasBudget && remaining < 0;
+
   // Progress Bar percentage
-  const percent = Math.min((totalAct / targetBudget) * 100, 100);
+  const percent = hasBudget ? Math.min((totalAct / targetBudget) * 100, 100) : 0;
 
   return (
     <div className="page">
       <div className="page-header">
         <h1 className="page-title">{t('budget.title')}</h1>
+        <label className={styles.targetField}>
+          Currency
+          <select
+            className="input input-sm"
+            style={{ width: 'auto' }}
+            value={currency}
+            disabled={!canEdit || savingSettings}
+            onChange={(e) => saveSettings({ currency: e.target.value })}
+            title={canEdit ? 'Currency for this trip' : 'Only editors can change the currency'}
+          >
+            {CURRENCIES.map((c) => (
+              <option key={c.code} value={c.code}>{c.code} · {c.label}</option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <div className="split">
@@ -95,29 +131,33 @@ export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, userRole = '
       <div className={`card ${styles.summaryCard}`}>
         <div className={styles.gaugeHeader}>
           <span className="eyebrow">{t('budget.actual_spent')}</span>
-          <span className={styles.gaugeValue}>
-            {totalAct.toLocaleString()}
-            <span className={styles.currency}>THB</span>
-          </span>
+          <span className={styles.gaugeValue}>{money(totalAct)}</span>
         </div>
 
-        <div className={styles.progressBar}>
-          <div
-            className={`${styles.progressFill} ${isOverBudget ? styles.progressFillAlert : ''}`}
-            style={{ width: `${percent}%` }}
-          />
-        </div>
+        {hasBudget && (
+          <div className={styles.progressBar}>
+            <div
+              className={`${styles.progressFill} ${isOverBudget ? styles.progressFillAlert : ''}`}
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+        )}
 
         <div className={styles.targetRow}>
-          <span>{targetBudget > 0 ? Math.round(percent) : 0}% of target</span>
+          <span>{hasBudget ? `${Math.round(percent)}% of the group budget` : 'Set a budget for the whole group'}</span>
           <label className={styles.targetField}>
-            Target
+            Budget
             <input
               type="number"
+              inputMode="decimal"
+              min="0"
               className="input input-sm tabular"
-              value={targetBudget}
-              disabled={userRole === 'viewer'}
-              onChange={(e) => handleTargetChange(e.target.value)}
+              placeholder="0"
+              value={budgetInput}
+              disabled={!canEdit || savingSettings}
+              onChange={(e) => setBudgetInput(e.target.value)}
+              onBlur={commitBudget}
+              onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
             />
           </label>
         </div>
@@ -125,21 +165,21 @@ export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, userRole = '
         <div className={styles.spentStats}>
           <div className={styles.statItem}>
             <span className={styles.statLabel}>{t('budget.remaining')}</span>
-            <span className={`${styles.statValue} ${isOverBudget ? styles.statNegative : styles.statPositive}`}>
-              {remaining.toLocaleString()}
+            <span className={`${styles.statValue} ${!hasBudget ? '' : isOverBudget ? styles.statNegative : styles.statPositive}`}>
+              {hasBudget ? money(remaining) : '—'}
             </span>
           </div>
           <div className={styles.statItem}>
             <span className={styles.statLabel}>Planned</span>
-            <span className={styles.statValue}>{totalEst.toLocaleString()}</span>
+            <span className={styles.statValue}>{money(totalEst)}</span>
           </div>
           <div className={styles.statItem}>
             <span className={styles.statLabel}>{t('budget.daily_average')}</span>
-            <span className={styles.statValue}>{Math.round(costPerDay).toLocaleString()}</span>
+            <span className={styles.statValue}>{money(Math.round(costPerDay))}</span>
           </div>
           <div className={styles.statItem}>
             <span className={styles.statLabel}>{t('budget.cost_per_person')}</span>
-            <span className={styles.statValue}>{Math.round(costPerPerson).toLocaleString()}</span>
+            <span className={styles.statValue}>{money(Math.round(costPerPerson))}</span>
           </div>
         </div>
       </div>
@@ -160,7 +200,7 @@ export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, userRole = '
                     {t(`budget.categories.${cat}`)}
                   </span>
                   <span className={styles.itemAmount}>
-                    {amount.toLocaleString()}
+                    {money(amount)}
                     <span className={styles.itemPercent}>{Math.round(catPercent)}%</span>
                   </span>
                 </div>

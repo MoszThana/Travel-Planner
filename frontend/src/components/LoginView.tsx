@@ -5,9 +5,23 @@ import { useAuth } from '@/context/AuthContext';
 import styles from './LoginView.module.css';
 import { Icon } from './Icon';
 
-export const LoginView: React.FC = () => {
+interface LoginViewProps {
+  // Token from an invite link (?invite=...), accepted automatically after login
+  inviteToken?: string | null;
+}
+
+interface InvitePreview {
+  trip: { name: string; destination: string; startDate: number; endDate: number };
+  inviterName: string;
+  role: string;
+}
+
+export const LoginView: React.FC<LoginViewProps> = ({ inviteToken }) => {
   const { allUsers, loginWithPin, createProfile, refreshProfiles } = useAuth();
-  const [tab, setTab] = useState<'login' | 'create'>('login');
+  // Invited friends usually don't have a profile yet
+  const [tab, setTab] = useState<'login' | 'create'>(inviteToken ? 'create' : 'login');
+  const [invite, setInvite] = useState<InvitePreview | null>(null);
+  const [inviteError, setInviteError] = useState('');
   
   // Login State
   const [selectedUserId, setSelectedUserId] = useState('');
@@ -24,6 +38,17 @@ export const LoginView: React.FC = () => {
   useEffect(() => {
     refreshProfiles();
   }, [refreshProfiles]);
+
+  useEffect(() => {
+    if (!inviteToken) return;
+    fetch(`/api/invites/${encodeURIComponent(inviteToken)}`)
+      .then(async (res) => {
+        const data = await res.json() as any;
+        if (res.ok) setInvite(data);
+        else setInviteError(data.error || 'This invite link is not valid.');
+      })
+      .catch(() => setInviteError("Couldn't check the invite link."));
+  }, [inviteToken]);
 
   useEffect(() => {
     if (allUsers.length > 0 && !selectedUserId) {
@@ -85,6 +110,22 @@ export const LoginView: React.FC = () => {
       </section>
 
       <div className={styles.card}>
+        {invite && (
+          <div className={styles.inviteBanner}>
+            <Icon name="users" size={18} />
+            <div>
+              <strong>{invite.inviterName}</strong> invited you to <strong>{invite.trip.name}</strong>
+              <span className={styles.inviteMeta}>
+                {invite.trip.destination} · {new Date(invite.trip.startDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                {' – '}
+                {new Date(invite.trip.endDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+              </span>
+              <span className={styles.inviteMeta}>Create a profile (or sign in) to join.</span>
+            </div>
+          </div>
+        )}
+        {inviteError && <div className="form-error">{inviteError}</div>}
+
         <div className={styles.header}>
           <h2 className={styles.formTitle}>Welcome back</h2>
           <p className={styles.formSubtitle}>Choose your profile and enter your PIN.</p>

@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { useTranslation } from '@/context/TranslationContext';
 import { useAuth } from '@/context/AuthContext';
-import { apiRequest } from '@/utils/api';
+import { apiRequest, showError } from '@/utils/api';
+import { formatMoney } from '@/utils/money';
 import { Icon } from './Icon';
 import localStyles from './ExpenseSplit.module.css';
 
@@ -14,29 +15,31 @@ interface ExpenseSplitProps {
 }
 
 export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, userRole = 'editor' }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { user } = useAuth();
+  const canEdit = userRole === 'owner' || userRole === 'editor';
+  const currency = trip.currency || 'THB';
+  const money = (value: number) => formatMoney(value, currency, locale);
 
   const [showAddForm, setShowAddForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [payerId, setPayerId] = useState(user?.id || '');
   const [category, setCategory] = useState('food');
   const [splitType, setSplitType] = useState('equal'); // 'equal' | 'custom'
-  
-  // Custom splits specific inputs
+
+  // Custom split amounts per member
   const [customSplits, setCustomSplits] = useState<Record<string, string>>({});
-  // Checkbox select for who shares
+  // Who shares the cost (everyone by default)
   const [sharesCheck, setSharesCheck] = useState<Record<string, boolean>>(
     trip.members ? trip.members.reduce((acc: any, m: any) => ({ ...acc, [m.id]: true }), {}) : {}
   );
 
-  // Suggestions state (mock collaboration queue)
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-
   // 1. Calculate Balances & Debt Settlements
   const members = trip.members || [];
-  const expenses = trip.expenses || [];
+  const expenses = [...(trip.expenses || [])].sort((a: any, b: any) => b.createdAt - a.createdAt);
   const splits = trip.splits || [];
 
   const balances: Record<string, number> = {};
@@ -47,219 +50,131 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
     if (exp.payerId in balances) {
       balances[exp.payerId] += exp.amount;
     }
-    const expSplits = splits.filter((s: any) => s.expenseId === exp.id);
-    expSplits.forEach((sp: any) => {
+    splits.filter((s: any) => s.expenseId === exp.id).forEach((sp: any) => {
       if (sp.userId in balances) {
         balances[sp.userId] -= sp.amount;
       }
     });
   });
 
-  // Debt Simplification Algorithm
-  const debtors: { userId: string; balance: number }[] = [];
-  const creditors: { userId: string; balance: number }[] = [];
-
-  Object.entries(balances).forEach(([userId, bal]) => {
-    if (bal < -0.01) {
-      debtors.push({ userId, balance: bal });
-    } else if (bal > 0.01) {
-      creditors.push({ userId, balance: bal });
-    }
-  });
-
-  // Sort debtors ascending (most negative first) and creditors descending (most positive first)
-  debtors.sort((a, b) => a.balance - b.balance);
-  creditors.sort((a, b) => b.balance - a.balance);
+  // Debt simplification: match the biggest debtors with the biggest creditors
+  const debtors = Object.entries(balances)
+    .filter(([, bal]) => bal < -0.01)
+    .map(([userId, balance]) => ({ userId, balance }))
+    .sort((a, b) => a.balance - b.balance);
+  const creditors = Object.entries(balances)
+    .filter(([, bal]) => bal > 0.01)
+    .map(([userId, balance]) => ({ userId, balance }))
+    .sort((a, b) => b.balance - a.balance);
 
   const settlements: { from: string; to: string; amount: number }[] = [];
   let dIdx = 0;
   let cIdx = 0;
-
-  // Copy values to manipulate
-  const tempDebtors = debtors.map(d => ({ ...d }));
-  const tempCreditors = creditors.map(c => ({ ...c }));
-
-  while (dIdx < tempDebtors.length && cIdx < tempCreditors.length) {
-    const debtor = tempDebtors[dIdx];
-    const creditor = tempCreditors[cIdx];
-
-    const debtVal = Math.abs(debtor.balance);
-    const creditVal = creditor.balance;
-
-    const settleVal = Math.min(debtVal, creditVal);
+  while (dIdx < debtors.length && cIdx < creditors.length) {
+    const debtor = debtors[dIdx];
+    const creditor = creditors[cIdx];
+    const settleVal = Math.min(Math.abs(debtor.balance), creditor.balance);
     if (settleVal > 0.01) {
-      settlements.push({
-        from: debtor.userId,
-        to: creditor.userId,
-        amount: settleVal
-      });
+      settlements.push({ from: debtor.userId, to: creditor.userId, amount: settleVal });
     }
-
     debtor.balance += settleVal;
     creditor.balance -= settleVal;
-
     if (Math.abs(debtor.balance) < 0.01) dIdx++;
     if (creditor.balance < 0.01) cIdx++;
   }
 
-  // Handle new payment entry submission
-  const handleAddExpenseSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!description || !amount || !payerId) return;
+  const totalSpent = expenses.reduce((sum: number, e: any) => sum + (e.amount || 0), 0);
 
-    const totalAmount = parseFloat(amount);
-    const selectedMembers = Object.entries(sharesCheck)
-      .filter(([_, checked]) => checked)
-      .map(([mid]) => mid);
-
-    if (selectedMembers.length === 0) {
-      alert('Select at least one member to share the expense.');
-      return;
-    }
-
-    // Prepare splits list
-    let splitPayload: { userId: string; amount: number }[] = [];
-
-    if (splitType === 'equal') {
-      const share = totalAmount / selectedMembers.length;
-      splitPayload = selectedMembers.map(userId => ({
-        userId,
-        amount: parseFloat(share.toFixed(2))
-      }));
-    } else {
-      // Validate custom split sum equals total
-      let customSum = 0;
-      splitPayload = selectedMembers.map(userId => {
-        const val = parseFloat(customSplits[userId]) || 0;
-        customSum += val;
-        return { userId, amount: val };
-      });
-
-      if (Math.abs(customSum - totalAmount) > 1) {
-        alert(`Error: The sum of custom split amounts (${customSum.toLocaleString()} THB) must equal the total expense amount (${totalAmount.toLocaleString()} THB).`);
-        return;
-      }
-    }
-
-    const payload = {
-      tripId: trip.id,
-      payerId,
-      amount: totalAmount,
-      description,
-      category,
-      splitType,
-      splits: splitPayload
-    };
-
-    // If user is owner (Maru), commit directly. Otherwise, place in collaborative queue!
-    const isOwner = user?.id === trip.ownerId;
-
-    if (isOwner) {
-      try {
-        await apiRequest('/expenses', {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
-      } catch {
-        // Offline fallback
-        const offlineTrips = JSON.parse(localStorage.getItem('offline_trips') || '[]');
-        const offlineTrip = offlineTrips.find((t: any) => t.id === trip.id);
-        if (offlineTrip) {
-          const expId = `exp-${Date.now()}`;
-          offlineTrip.expenses.push({
-            id: expId,
-            tripId: trip.id,
-            payerId,
-            amount: totalAmount,
-            description,
-            category,
-            splitType,
-            createdAt: Date.now()
-          });
-          splitPayload.forEach(sp => {
-            offlineTrip.splits.push({
-              id: `split-${Date.now()}-${Math.random()}`,
-              expenseId: expId,
-              userId: sp.userId,
-              amount: sp.amount
-            });
-          });
-          localStorage.setItem('offline_trips', JSON.stringify(offlineTrips));
-        }
-      }
-      onRefresh();
-    } else {
-      // Non-owner: suggest expense instead (collaboration rule)
-      const newSuggestion = {
-        id: `sug-${Date.now()}`,
-        suggestedBy: user?.name || 'Guest',
-        payload
-      };
-      setSuggestions(prev => [...prev, newSuggestion]);
-      alert('Your group expense has been sent as a suggestion to the trip owner for approval!');
-    }
-
+  const resetForm = () => {
     setDescription('');
     setAmount('');
     setPayerId(user?.id || '');
     setCustomSplits({});
+    setFormError('');
     setShowAddForm(false);
   };
 
-  const handleApproveSuggestion = async (sugId: string, payload: any) => {
+  const handleAddExpenseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+    if (!description || !amount || !payerId) return;
+
+    const totalAmount = parseFloat(amount);
+    if (!(totalAmount > 0)) {
+      setFormError('Enter an amount greater than 0.');
+      return;
+    }
+    const selectedMembers = Object.entries(sharesCheck)
+      .filter(([, checked]) => checked)
+      .map(([mid]) => mid)
+      .filter((mid) => members.some((m: any) => m.id === mid));
+
+    if (selectedMembers.length === 0) {
+      setFormError('Select at least one person to share the cost.');
+      return;
+    }
+
+    let splitPayload: { userId: string; amount: number }[];
+    if (splitType === 'equal') {
+      // Split in cents so the shares add up exactly to the total
+      const cents = Math.round(totalAmount * 100);
+      const base = Math.floor(cents / selectedMembers.length);
+      const remainder = cents - base * selectedMembers.length;
+      splitPayload = selectedMembers.map((userId, i) => ({
+        userId,
+        amount: (base + (i < remainder ? 1 : 0)) / 100
+      }));
+    } else {
+      splitPayload = selectedMembers.map(userId => ({ userId, amount: parseFloat(customSplits[userId]) || 0 }));
+      const customSum = splitPayload.reduce((sum, s) => sum + s.amount, 0);
+      if (Math.abs(customSum - totalAmount) > 0.01) {
+        setFormError(`The custom amounts add up to ${money(customSum)}, but the total is ${money(totalAmount)}.`);
+        return;
+      }
+    }
+
+    setSaving(true);
     try {
       await apiRequest('/expenses', {
         method: 'POST',
-        body: JSON.stringify(payload)
-      });
-    } catch {
-      // Offline direct commit
-      const offlineTrips = JSON.parse(localStorage.getItem('offline_trips') || '[]');
-      const offlineTrip = offlineTrips.find((t: any) => t.id === trip.id);
-      if (offlineTrip) {
-        const expId = `exp-${Date.now()}`;
-        offlineTrip.expenses.push({
-          id: expId,
+        body: JSON.stringify({
           tripId: trip.id,
-          payerId: payload.payerId,
-          amount: payload.amount,
-          description: payload.description,
-          category: payload.category,
-          splitType: payload.splitType,
-          createdAt: Date.now()
-        });
-        payload.splits.forEach((sp: any) => {
-          offlineTrip.splits.push({
-            id: `split-${Date.now()}-${Math.random()}`,
-            expenseId: expId,
-            userId: sp.userId,
-            amount: sp.amount
-          });
-        });
-        localStorage.setItem('offline_trips', JSON.stringify(offlineTrips));
-      }
+          payerId,
+          amount: totalAmount,
+          description,
+          category,
+          splitType,
+          splits: splitPayload
+        })
+      });
+      resetForm();
+      onRefresh();
+    } catch (err: any) {
+      setFormError(err?.message || "Couldn't save the expense.");
+    } finally {
+      setSaving(false);
     }
-    setSuggestions(prev => prev.filter(s => s.id !== sugId));
-    onRefresh();
   };
 
-  const getUserName = (id: string) => {
-    const found = members.find((m: any) => m.id === id);
-    return found ? found.name : id;
+  const handleDeleteExpense = async (exp: any) => {
+    if (!window.confirm(`Delete "${exp.description}" (${money(exp.amount)})?`)) return;
+    try {
+      await apiRequest(`/expenses/${exp.id}`, { method: 'DELETE' });
+      onRefresh();
+    } catch (err) {
+      showError(err, "Couldn't delete the expense.");
+    }
   };
 
-  const getUserAvatar = (id: string) => {
-    const found = members.find((m: any) => m.id === id);
-    return found ? found.avatarUrl : 'https://api.dicebear.com/7.x/adventurer/svg';
-  };
-
-  const isOwner = user?.id === trip.ownerId;
+  const getUserName = (id: string) => members.find((m: any) => m.id === id)?.name || 'Former member';
+  const getUserAvatar = (id: string) =>
+    members.find((m: any) => m.id === id)?.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg';
 
   return (
     <div className="page">
       <div className="page-header">
         <h1 className="page-title">{t('group.title')}</h1>
-        {userRole !== 'viewer' && (
+        {canEdit && (
           <button className="btn btn-primary btn-sm" onClick={() => setShowAddForm(true)}>
             <Icon name="plus" size={16} />
             Expense
@@ -271,7 +186,7 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
       <div className="stack">
       {/* Members */}
       <section className="section">
-        <span className="eyebrow">{t('group.members')}</span>
+        <span className="eyebrow">{t('group.members')} · {members.length}</span>
         <div className={localStyles.memberList}>
           {members.map((m: any) => (
             <div key={m.id} className={localStyles.memberItem}>
@@ -287,44 +202,13 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
         </div>
       </section>
 
-      {/* Owner Approvals Queue */}
-      {isOwner && suggestions.length > 0 && (
-        <section className="section">
-          <span className="eyebrow">Pending suggestions · {suggestions.length}</span>
-          <div className="list">
-            {suggestions.map((sug) => (
-              <div key={sug.id} className={`list-row ${localStyles.approvalCard}`}>
-                <div className={localStyles.approvalHeader}>
-                  <span className="list-title">{sug.payload.description}</span>
-                  <span className="chip">by {sug.suggestedBy}</span>
-                </div>
-                <span className="list-sub">
-                  {getUserName(sug.payload.payerId)} paid {sug.payload.amount} THB
-                </span>
-                <div className="btn-row">
-                  <button className="btn btn-sm" onClick={() => setSuggestions(prev => prev.filter(s => s.id !== sug.id))}>
-                    Reject
-                  </button>
-                  <button className="btn btn-sm btn-primary" onClick={() => handleApproveSuggestion(sug.id, sug.payload)}>
-                    Approve
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      </div>
-
-      <div className="stack">
       {/* Debt Settlement Summary */}
       <section className="section">
         <span className="eyebrow">{t('group.who_owes_whom')}</span>
         {settlements.length === 0 ? (
           <div className={`card ${localStyles.settled}`}>
             <Icon name="check" size={18} />
-            {t('group.no_debts')}
+            {expenses.length === 0 ? 'No shared expenses yet.' : t('group.no_debts')}
           </div>
         ) : (
           <div className="list">
@@ -339,23 +223,62 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
                   <img src={getUserAvatar(set.to)} alt="" className="avatar avatar-sm" />
                   <span>{getUserName(set.to)}</span>
                 </div>
-                <span className={localStyles.debtAmount}>{Math.round(set.amount).toLocaleString()} THB</span>
+                <span className={localStyles.debtAmount}>{money(set.amount)}</span>
               </div>
             ))}
           </div>
         )}
       </section>
+      </div>
 
+      <div className="stack">
+      {/* Recorded expenses */}
+      <section className="section">
+        <div className="section-head">
+          <span className="eyebrow">Expenses · {expenses.length}</span>
+          {expenses.length > 0 && <span className="muted tabular" style={{ fontSize: '13px' }}>Total {money(totalSpent)}</span>}
+        </div>
+        {expenses.length === 0 ? (
+          <div className="empty">
+            <Icon name="wallet" size={26} />
+            {canEdit ? 'Record who paid for meals, rides and tickets — the app works out who owes whom.' : 'No shared expenses yet.'}
+          </div>
+        ) : (
+          <div className="list">
+            {expenses.map((exp: any) => {
+              const sharedBy = splits.filter((s: any) => s.expenseId === exp.id).length;
+              return (
+                <div key={exp.id} className="list-row">
+                  <div className={localStyles.expenseText}>
+                    <span className="list-title">{exp.description}</span>
+                    <span className="list-sub">
+                      {getUserName(exp.payerId)} paid · split {sharedBy} way{sharedBy === 1 ? '' : 's'} · {new Date(exp.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span className={localStyles.debtAmount}>{money(exp.amount)}</span>
+                    {canEdit && (
+                      <button className="btn-icon danger" onClick={() => handleDeleteExpense(exp)} aria-label="Delete expense">
+                        <Icon name="trash" size={15} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
       </div>
       </div>
 
       {/* Add Expense Sheet */}
       {showAddForm && (
-        <div className="sheet-overlay" onClick={() => setShowAddForm(false)}>
+        <div className="sheet-overlay" onClick={resetForm}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <div className="sheet-head">
               <h2 className="sheet-title">Shared expense</h2>
-              <button type="button" className="btn-icon" onClick={() => setShowAddForm(false)} aria-label={t('common.cancel')}>
+              <button type="button" className="btn-icon" onClick={resetForm} aria-label={t('common.cancel')}>
                 <Icon name="x" size={18} />
               </button>
             </div>
@@ -366,7 +289,7 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
                   type="text"
                   required
                   className="input"
-                  placeholder="e.g., Dinner at Shibuya"
+                  placeholder="e.g., Dinner at Dotonbori"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                 />
@@ -374,9 +297,12 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
 
               <div className="field-row">
                 <div className="field">
-                  <label className="label">Amount (THB)</label>
+                  <label className="label">Amount ({currency})</label>
                   <input
                     type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="any"
                     required
                     className="input"
                     placeholder="0"
@@ -429,7 +355,19 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
 
               {/* Share checklist */}
               <div className="field">
-                <label className="label">{t('group.shared_by')}</label>
+                <label className="label">
+                  {t('group.shared_by')}
+                  <button
+                    type="button"
+                    className={localStyles.linkButton}
+                    onClick={() => {
+                      const allOn = members.every((m: any) => sharesCheck[m.id]);
+                      setSharesCheck(members.reduce((acc: any, m: any) => ({ ...acc, [m.id]: !allOn }), {}));
+                    }}
+                  >
+                    {members.every((m: any) => sharesCheck[m.id]) ? 'Clear all' : 'Select all'}
+                  </button>
+                </label>
                 <div className="list">
                   {members.map((m: any) => {
                     const isChecked = !!sharesCheck[m.id];
@@ -447,11 +385,11 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
                           <span>{m.name}</span>
                         </label>
 
-                        {/* Custom amount field if Custom Split is selected */}
                         {splitType === 'custom' && isChecked && (
                           <input
                             type="number"
-                            placeholder="THB"
+                            inputMode="decimal"
+                            placeholder={currency}
                             className={`input input-sm tabular ${localStyles.customSplitInput}`}
                             value={customSplits[m.id] || ''}
                             onChange={(e) => setCustomSplits(prev => ({ ...prev, [m.id]: e.target.value }))}
@@ -463,12 +401,14 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
                 </div>
               </div>
 
+              {formError && <div className="form-error">{formError}</div>}
+
               <div className="btn-row">
-                <button type="button" className="btn" onClick={() => setShowAddForm(false)}>
+                <button type="button" className="btn" onClick={resetForm}>
                   {t('common.cancel')}
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  {t('common.save')}
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  {saving ? t('common.loading') : t('common.save')}
                 </button>
               </div>
             </form>

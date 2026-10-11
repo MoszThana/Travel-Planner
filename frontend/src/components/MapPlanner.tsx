@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from '@/context/TranslationContext';
-import { apiRequest } from '@/utils/api';
+import { apiRequest, showError } from '@/utils/api';
 import { GoogleMap, Marker, Polyline, useJsApiLoader } from '@react-google-maps/api';
 import styles from './MapPlanner.module.css';
 import { Icon } from './Icon';
@@ -32,6 +32,21 @@ const getRouteColor = () => {
   return getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#1f5c4f';
 };
 
+const escapeHtml = (value: string): string =>
+  String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+
+// Straight-line distance between two pinned stops (haversine), in km
+const distanceKm = (a: any, b: any): number => {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+};
+
+const routeKm = (stops: any[]): number =>
+  stops.slice(1).reduce((sum, stop, i) => sum + distanceKm(stops[i], stop), 0);
+
 export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRole = 'editor' }) => {
   const { t } = useTranslation();
   const [activeDayIdx, setActiveDayIdx] = useState(0);
@@ -41,6 +56,8 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [optimizedOrder, setOptimizedOrder] = useState<any[]>([]);
+  const [routeStats, setRouteStats] = useState<{ originalKm: number; optimizedKm: number } | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Map reference to programmatically pan
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -52,33 +69,18 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
   const polylineRef = useRef<any>(null);
 
   const activeDay = trip.days && trip.days[activeDayIdx];
-  const dayActivities = trip.activities
-    ? trip.activities.filter((a: any) => a.dayId === activeDay?.id)
-    : [];
+  const dayActivities = useMemo(
+    () => (trip.activities ? trip.activities.filter((a: any) => a.dayId === activeDay?.id) : []),
+    [trip.activities, activeDay?.id]
+  );
 
-  // Filter activities that have valid coordinates, and assign mock coords if missing so they show on map
-  const getValidMapActivities = () => {
-    const withCoords = dayActivities.filter((act: any) => act.lat && act.lng);
-    const baseCenter = withCoords.length > 0 ? { lat: withCoords[0].lat, lng: withCoords[0].lng } : DEFAULT_CENTER;
-
-    return dayActivities.map((act: any, idx: number) => {
-      if (act.lat && act.lng) {
-        return act;
-      }
-      // Generate clean mock coordinates in sequence around base center
-      const angle = idx * 0.5;
-      const radius = 0.005 + idx * 0.003;
-      const mockLat = baseCenter.lat + Math.sin(angle) * radius;
-      const mockLng = baseCenter.lng + Math.cos(angle) * radius;
-      return {
-        ...act,
-        lat: mockLat,
-        lng: mockLng
-      };
-    });
-  };
-
-  const validMapActivities = getValidMapActivities();
+  // Only stops with a real map pin are drawn; stopNumber keeps the number shown in the stop list
+  const validMapActivities = useMemo(
+    () => dayActivities
+      .map((act: any, idx: number) => ({ ...act, stopNumber: idx + 1 }))
+      .filter((act: any) => act.lat != null && act.lng != null),
+    [dayActivities]
+  );
 
   // Initialize Google Maps script loader
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
@@ -161,16 +163,17 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
 
     // Add new markers
     const latlngs: any[] = [];
-    validMapActivities.forEach((act: any, idx: number) => {
-      if (act.lat && act.lng) {
+    validMapActivities.forEach((act: any) => {
+      if (act.lat != null && act.lng != null) {
         const marker = L.marker([act.lat, act.lng], {
           icon: L.divIcon({
             className: styles.customLeafletMarker,
-            html: `<div class="${styles.markerLabel}">${idx + 1}</div>`
+            html: `<div class="${styles.markerLabel}">${act.stopNumber}</div>`
           })
         })
           .addTo(map)
-          .bindPopup(`<b>${idx + 1}. ${act.name}</b><br/>${act.time || '12:00'}`);
+          // Names come from trip members: escape them, never insert raw HTML
+          .bindPopup(`<b>${act.stopNumber}. ${escapeHtml(act.name)}</b><br/>${escapeHtml(act.time || '')}`);
         markersRef.current.push(marker);
         latlngs.push([act.lat, act.lng]);
       }
@@ -208,124 +211,121 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
   const selectedStop = selectedIdx >= 0 ? dayActivities[selectedIdx] : null;
   const selectedStopPrev = selectedIdx > 0 ? dayActivities[selectedIdx - 1] : null;
 
-  const handleSearch = (e: React.FormEvent) => {
+  // Find the place with OpenStreetMap search, then add it to this day at its real location
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery || !activeDay) return;
+    const query = searchQuery.trim();
+    if (!query || !activeDay) return;
 
-    // Simulate location discovery
-    const mockLat = center.lat + (Math.random() - 0.5) * 0.03;
-    const mockLng = center.lng + (Math.random() - 0.5) * 0.03;
-
-    const payload = {
-      dayId: activeDay.id,
-      name: searchQuery,
-      time: '14:30',
-      location: searchQuery,
-      lat: mockLat,
-      lng: mockLng,
-      transportType: 'walk',
-      estCost: 500,
-      costCategory: 'activity',
-      order: dayActivities.length + 1
-    };
-
-    apiRequest('/activities', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    }).then(() => {
-      setSearchQuery('');
-      onRefresh();
-    }).catch(() => {
-      // Offline fallback
-      const offlineTrips = JSON.parse(localStorage.getItem('offline_trips') || '[]');
-      const offlineTrip = offlineTrips.find((t: any) => t.id === trip.id);
-      if (offlineTrip) {
-        offlineTrip.activities = offlineTrip.activities || [];
-        offlineTrip.activities.push({
-          id: `act-${Date.now()}`,
-          ...payload,
-          actCost: 0,
-          visited: 0
-        });
-        localStorage.setItem('offline_trips', JSON.stringify(offlineTrips));
+    setIsSearching(true);
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?${new URLSearchParams({
+        format: 'json',
+        limit: '1',
+        q: [query, trip.destination].filter(Boolean).join(', '),
+      })}`);
+      let results = res.ok ? await res.json() as any[] : [];
+      if (results.length === 0) {
+        // Retry without the destination (e.g. a place outside the main city)
+        const retry = await fetch(`https://nominatim.openstreetmap.org/search?${new URLSearchParams({ format: 'json', limit: '1', q: query })}`);
+        results = retry.ok ? await retry.json() as any[] : [];
       }
+      const place = results[0];
+      if (!place) {
+        showError(null, `Couldn't find "${query}" on the map. Try a more specific name.`);
+        return;
+      }
+
+      // New stop goes after the last one, an hour later
+      const lastTime = dayActivities[dayActivities.length - 1]?.time as string | undefined;
+      const [h, m] = (lastTime || '11:00').split(':').map(Number);
+      const nextHour = Math.min((Number.isFinite(h) ? h : 11) + 1, 23);
+
+      await apiRequest('/activities', {
+        method: 'POST',
+        body: JSON.stringify({
+          dayId: activeDay.id,
+          name: place.name || query,
+          time: `${String(nextHour).padStart(2, '0')}:${String(Number.isFinite(m) ? m : 0).padStart(2, '0')}`,
+          location: place.display_name?.split(',').slice(0, 2).join(',') || query,
+          lat: parseFloat(place.lat),
+          lng: parseFloat(place.lon),
+          transportType: 'walk',
+          estCost: 0,
+          costCategory: 'activity',
+          order: dayActivities.length + 1
+        })
+      });
       setSearchQuery('');
       onRefresh();
-    });
+    } catch (err) {
+      showError(err, "Couldn't add the place.");
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const handleOptimizeClick = () => {
     if (dayActivities.length < 3) {
-      alert('Needs at least 3 activities on the timeline to calculate optimizations.');
+      showError(null, 'Add at least 3 stops to this day to look for a shorter order.');
       return;
     }
-    
-    setIsOptimizing(true);
-    setTimeout(() => {
-      // TSP nearest neighbor algorithm based on coordinates
-      const original = [...dayActivities];
-      const optimized = [original[0]];
-      const remaining = original.slice(1);
-      
-      let current = original[0];
-      while (remaining.length > 0) {
-        let nearestIdx = 0;
-        let minDist = Infinity;
-        for (let i = 0; i < remaining.length; i++) {
-          const dy = (remaining[i].lat || current.lat || 0) - (current.lat || 0);
-          const dx = (remaining[i].lng || current.lng || 0) - (current.lng || 0);
-          const dist = Math.sqrt(dx*dx + dy*dy);
-          if (dist < minDist) {
-            minDist = dist;
-            nearestIdx = i;
-          }
-        }
-        current = remaining[nearestIdx];
-        optimized.push(current);
-        remaining.splice(nearestIdx, 1);
-      }
+    const unpinned = dayActivities.filter((a: any) => a.lat == null || a.lng == null);
+    if (unpinned.length > 0) {
+      showError(null, `${unpinned.length} stop${unpinned.length === 1 ? ' has' : 's have'} no map pin (${unpinned.map((a: any) => a.name).join(', ')}). Pin every stop first.`);
+      return;
+    }
 
-      setOptimizedOrder(optimized);
-      setShowComparison(true);
-      setIsOptimizing(false);
-    }, 1000);
+    // Nearest-neighbour order from the first stop (the day's starting point stays first)
+    const original = [...dayActivities];
+    const optimized = [original[0]];
+    const remaining = original.slice(1);
+    let current = original[0];
+    while (remaining.length > 0) {
+      let nearestIdx = 0;
+      let minDist = Infinity;
+      remaining.forEach((stop: any, i: number) => {
+        const dist = distanceKm(current, stop);
+        if (dist < minDist) {
+          minDist = dist;
+          nearestIdx = i;
+        }
+      });
+      current = remaining[nearestIdx];
+      optimized.push(current);
+      remaining.splice(nearestIdx, 1);
+    }
+
+    const originalKm = routeKm(original);
+    const optimizedKm = routeKm(optimized);
+    if (optimizedKm >= originalKm - 0.1) {
+      showError(null, `This day's order is already the shortest we can find (${originalKm.toFixed(1)} km in straight lines).`);
+      return;
+    }
+
+    setOptimizedOrder(optimized);
+    setRouteStats({ originalKm, optimizedKm });
+    setShowComparison(true);
   };
 
   const applyOptimization = async () => {
     if (optimizedOrder.length === 0) return;
 
-    const updatedItems = optimizedOrder.map((item, index) => ({
-      id: item.id,
-      dayId: activeDay.id,
-      order: index + 1
-    }));
-
-    const restActivities = trip.activities.filter((a: any) => a.dayId !== activeDay.id);
-    const merged = [...restActivities];
-    optimizedOrder.forEach((item, index) => {
-      merged.push({
-        ...item,
-        order: index + 1
-      });
-    });
-    trip.activities = merged;
-
+    setIsOptimizing(true);
     try {
       await apiRequest('/activities/reorder', {
         method: 'PUT',
-        body: JSON.stringify({ items: updatedItems })
+        body: JSON.stringify({
+          items: optimizedOrder.map((item, index) => ({ id: item.id, dayId: activeDay.id, order: index + 1 }))
+        })
       });
-    } catch {
-      const offlineTrips = JSON.parse(localStorage.getItem('offline_trips') || '[]');
-      const offlineTrip = offlineTrips.find((t: any) => t.id === trip.id);
-      if (offlineTrip) {
-        offlineTrip.activities = merged;
-        localStorage.setItem('offline_trips', JSON.stringify(offlineTrips));
-      }
+      setShowComparison(false);
+      onRefresh();
+    } catch (err) {
+      showError(err, "Couldn't reorder the stops.");
+    } finally {
+      setIsOptimizing(false);
     }
-    
-    setShowComparison(false);
-    onRefresh();
   };
 
   // Center the map on a specific coordinate when clicking the list
@@ -373,12 +373,12 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
             onLoad={(map) => { mapRef.current = map; }}
             onUnmount={() => { mapRef.current = null; }}
           >
-            {validMapActivities.map((act: any, idx: number) => (
+            {validMapActivities.map((act: any) => (
               <Marker
                 key={act.id}
                 position={{ lat: act.lat, lng: act.lng }}
                 label={{
-                  text: `${idx + 1}`,
+                  text: String(act.stopNumber),
                   color: 'white',
                   fontWeight: '600',
                   fontSize: '11px'
@@ -421,19 +421,23 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
             <span className="eyebrow">Route optimisation</span>
             <span className={styles.routeText}>
               <span className={styles.routeDot} style={{ background: 'var(--text-faint)' }} />
-              Original · 15.4 km (~45 min)
+              Current order · {routeStats?.originalKm.toFixed(1)} km
             </span>
             <span className={styles.routeText}>
               <span className={styles.routeDot} style={{ background: 'var(--primary)' }} />
-              Optimised · 11.2 km (~30 min)
+              Suggested order · {routeStats?.optimizedKm.toFixed(1)} km
+              {routeStats && ` (saves ${(routeStats.originalKm - routeStats.optimizedKm).toFixed(1)} km)`}
             </span>
-            <p className={styles.routeNote}>Stops reordered to avoid zig-zagging between places.</p>
+            <p className={styles.routeNote}>
+              Straight-line distances. New order: {optimizedOrder.map((a: any) => a.name).join(' → ')}.
+              Times are not changed — check them after reordering.
+            </p>
             <div className="btn-row">
               <button className="btn btn-sm" onClick={() => setShowComparison(false)}>
                 {t('common.cancel')}
               </button>
-              <button className="btn btn-sm btn-primary" onClick={applyOptimization}>
-                {t('map_planner.apply_optimization')}
+              <button className="btn btn-sm btn-primary" onClick={applyOptimization} disabled={isOptimizing}>
+                {isOptimizing ? t('common.loading') : t('map_planner.apply_optimization')}
               </button>
             </div>
           </div>
@@ -447,14 +451,15 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
               <input
                 type="text"
                 className={styles.searchInput}
-                placeholder={t('map_planner.search_placeholder')}
+                placeholder={isSearching ? 'Searching…' : 'Find a place to add…'}
                 value={searchQuery}
+                disabled={isSearching}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </form>
-            <button className={styles.optimizeBtn} disabled={isOptimizing} onClick={handleOptimizeClick}>
-              <Icon name="sparkles" size={15} />
-              {isOptimizing ? t('common.loading') : 'Optimise'}
+            <button className={styles.optimizeBtn} onClick={handleOptimizeClick} title="Find a shorter order for this day's stops">
+              <Icon name="route" size={15} />
+              Optimise
             </button>
           </div>
         )}

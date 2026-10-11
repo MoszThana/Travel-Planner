@@ -17,7 +17,8 @@
     "map": "Map",
     "budget": "Budget",
     "group": "Group",
-    "ai_assistant": "AI Assist"
+    "ai_assistant": "AI Assist",
+    "trip_info": "Trip info"
   },
   "auth": {
     "login": "Sign In",
@@ -142,5 +143,8 @@
     "embassy_info": "Embassy Contact Info",
     "medical_notes": "Medical & Allergy Notes",
     "add_contact": "Add Emergency Contact"
+  },
+  "info": {
+    "title": "Trip info"
   }
 }

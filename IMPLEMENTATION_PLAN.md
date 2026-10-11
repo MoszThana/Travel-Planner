@@ -19,8 +19,8 @@ How we work through it:
 | D1 | Remove the 4 demo profiles (Maru, Somchai, Jane, David) from the live database? | ✅ **Remove** — check what they own first and show you | Task 1.4 |
 | D2 | Keep 4-digit PINs, or move to a password (min 8 characters)? | ✅ **Keep 4-digit PIN**, with lockout after 5 wrong tries | Task 1.2 |
 | D3 | How long should someone stay logged in on a device? | ✅ **7 days** | Task 1.1 |
-| D4 | Share link: build real invite links, or remove the section (the Members screen already adds people)? | ⏳ Open — recommended: remove now, invite links in Phase 4 | Task 2.4 |
-| D5 | Expense "suggestions" (editors suggest, owner approves): save them in the database, or let editors record expenses directly? | ⏳ Open — recommended: editors record directly | Task 2.5 |
+| D4 | Share link: build real invite links, or remove the section (the Members screen already adds people)? | ✅ **Real invite links now** (task 4.6 moved into 2.4) — for a group of ~10 friends | Task 2.4 |
+| D5 | Expense "suggestions" (editors suggest, owner approves): save them in the database, or let editors record expenses directly? | ✅ **Editors record expenses directly**; suggestion queue removed | Task 2.5 |
 | D6 | Get a free Gemini API key for the AI features? | ✅ **No key — hide AI features** | Task 2.2 |
 
 ---
@@ -53,7 +53,7 @@ Problem today: the server trusts whatever user ID the browser sends; anyone can 
 - [x] **1.5 Profile list shows less personal data** — `S`
   - Login screen: show names + avatars only (no emails) to people who are not logged in.
 
-**Status:** all tasks done and tested locally (49 automated checks). Live DB migrated (`0002`), `SESSION_SECRET` set on Cloudflare. Code not pushed yet.
+**Status:** ✅ Deployed 2026-10-12 (commits `5683079`, `4525435`). Live checks: logged-out and forged-cookie requests refused (401), no emails or demo profiles shown to strangers.
 
 **Done when:** logged-out requests get `401`; a user cannot open another person's trip (`403`); wrong PIN 5× locks the profile; no demo profiles on live.
 
@@ -61,26 +61,28 @@ Problem today: the server trusts whatever user ID the browser sends; anyone can 
 
 ## Phase 2 — Make fake features real, or hide them (Usefulness 4 → 7)
 
-- [ ] **2.1 Real weather (Open-Meteo, free, no key)** — `M`
+- [x] **2.1 Real weather (Open-Meteo, free, no key)** — `M`
   - Find the trip's location: use the first activity with coordinates, otherwise look up the destination name with Open-Meteo geocoding.
   - Show the forecast for the trip's actual dates. If the trip starts more than 16 days away, show "Forecast available from <date>" instead of fake numbers.
   - Remove the hard-coded Tokyo coordinates and the mock weather in `/api/weather`.
-- [ ] **2.2 Hide AI features** — `S` (D6 = no key)
+- [x] **2.2 Hide AI features** — `S` (D6 = no key)
   - Hide the AI cost-estimate and nearby-suggestion buttons on activity cards, and the "Ask for ideas" card — no more canned answers like "Local Thai Diner" in Osaka.
   - Keep the rule-based schedule check (overlaps, missing lunch) — it is real logic, not AI — but stop calling Gemini for it.
   - Rename the "AI Assist" tab to something accurate (e.g. "Trip info": weather, emergency contacts).
   - Keep the code path so AI can be switched back on later by adding `GEMINI_API_KEY` (shown only when the key exists).
-- [ ] **2.3 Real route optimisation numbers** — `S`
+- [x] **2.3 Real route optimisation numbers** — `S`
   - Use real distances (haversine, km) for both the current and the suggested order; show the actual saving, or "Already the shortest order".
   - Skip stops without coordinates and say how many were skipped.
-- [ ] **2.4 Share link** — `S` (D4) — remove the broken `/trip/...?invite=` link (or replace in 4.6).
-- [ ] **2.5 Expense suggestions** — `S` (D5) — remove the queue that disappears on refresh; editors record expenses directly.
-- [ ] **2.6 Budget target saved per trip** — `S` — new `budget` column on `trips` (migration), shared by all members instead of one browser.
-- [ ] **2.7 Currency per trip** — `M` — new `currency` column (default `THB`, e.g. `JPY` for Japan); format all amounts with `Intl.NumberFormat`; pick currency when creating/editing a trip.
-- [ ] **2.8 No more silent "offline saves"** — `S`
+- [x] **2.4 Invite links** — `M` (D4) — replace the broken `/trip/...?invite=` link: the owner creates a link (editor or viewer, expires in 14 days, can be revoked); a friend opens it, logs in or creates a profile, and joins the trip.
+- [x] **2.5 Expense suggestions** — `S` (D5) — remove the queue that disappears on refresh; editors record expenses directly.
+- [x] **2.6 Budget target saved per trip** — `S` — new `budget` column on `trips` (migration), shared by all members instead of one browser.
+- [x] **2.7 Currency per trip** — `M` — new `currency` column (default `THB`, e.g. `JPY` for Japan); format all amounts with `Intl.NumberFormat`; pick currency when creating/editing a trip.
+- [x] **2.8 No more silent "offline saves"** — `S`
   - `Dashboard`, `Itinerary`, `ExpenseSplit`, `AIDrawer`, `MapPlanner` write to `localStorage` when the server fails and pretend it worked (e.g. a fake trip with fake members). Replace with a clear error message. Real offline viewing comes in 4.1.
 
 **Done when:** every number and suggestion shown is real, or the feature is clearly hidden.
+
+**Status:** all tasks done and tested locally (24 Phase 2 checks + Phase 1 regression). Also fixed along the way: map search added stops at random spots; map drew made-up pins for unpinned stops; map popup allowed HTML injection from activity names; Group tab never listed recorded expenses (now listed, with delete); "no lunch" warning fired on single-stop days. Needs migration `0003` on the live DB before deploying.
 
 ---
 
@@ -104,7 +106,7 @@ Problem today: the server trusts whatever user ID the browser sends; anyone can 
 - [ ] **4.3 Export** — `M` — add the itinerary to the phone calendar (`.ics` file) and a print-friendly view (Save as PDF from the browser).
 - [ ] **4.4 Packing checklist** — `M` — per trip, shared with members (new table `checklist_items`).
 - [ ] **4.5 Activity attachments** — `S` — attach tickets/booking PDFs to a specific activity (the DB already supports `activity_id`).
-- [ ] **4.6 Invite links** (if D4 = later) — `M` — owner creates a link with a role; the person logs in / creates a profile and joins.
+- [x] **4.6 Invite links** — moved into Phase 2 as task 2.4.
 
 ---
 

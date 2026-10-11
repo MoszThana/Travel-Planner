@@ -1,74 +1,53 @@
 import { NextResponse } from 'next/server';
-import { queryGemini } from '@/utils/aiHelper';
 import { requireUser, errorResponse } from '@/lib/access';
 
 export const runtime = 'edge';
 
-// POST /api/ai/gap-check - Schedule Gap Detection
+const toMinutes = (time?: string | null): number | null => {
+  const match = /^(\d{1,2}):(\d{2})/.exec(time || '');
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+};
+
+// POST /api/ai/gap-check - Rule-based schedule checks for one day (no AI involved)
 export async function POST(request: Request) {
   try {
     await requireUser(request);
     const body = await request.json() as any;
     const { activities } = body;
-    
+
     if (!activities || !Array.isArray(activities)) {
       return NextResponse.json({ error: 'Missing activities array' }, { status: 400 });
     }
 
-    const prompt = `Analyze this travel itinerary for structural issues. 
-Look for:
-1. Overlapping times (activities at the same time).
-2. Gaps larger than 4 hours during active hours (09:00 - 21:00).
-3. Unrealistic travel times (e.g., flight to car trip within 30 mins).
-4. Missing meal breaks (no activities near 12:00 or 18:00).
+    const issues: { type: string; message: string }[] = [];
+    const timed = activities
+      .map((a: any) => ({ ...a, minutes: toMinutes(a.time) }))
+      .filter((a: any) => a.minutes !== null)
+      .sort((a: any, b: any) => a.minutes - b.minutes);
 
-Itinerary: ${JSON.stringify(activities.map(a => ({ name: a.name, time: a.time, transport: a.transportType })))}
-
-Return ONLY a JSON array of issues. Example format:
-[
-  { "type": "Meal Skip", "message": "No lunch break scheduled around 12:00." },
-  { "type": "Tight Schedule", "message": "Only 10 minutes allocated to travel between A and B." }
-]`;
-
-    // Rule-based simulation fallback
-    const mockIssues: any[] = [];
-    
-    // Sort activities by time
-    const sorted = [...activities].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-    
-    // Rule 1: Meal checks
-    const times = sorted.map(a => a.time || '');
-    const hasLunch = times.some(t => {
-      const hr = parseInt(t.split(':')[0]);
-      return hr >= 11 && hr <= 14;
-    });
-    if (sorted.length > 0 && !hasLunch) {
-      mockIssues.push({ type: 'Meal Skip', message: 'No lunch break scheduled between 11:00 AM and 2:00 PM.' });
-    }
-
-    // Rule 2: Travel checks
-    for (let i = 0; i < sorted.length - 1; i++) {
-      const cur = sorted[i];
-      const next = sorted[i + 1];
-      if (cur.time && next.time) {
-        const curHr = parseInt(cur.time.split(':')[0]);
-        const curMin = parseInt(cur.time.split(':')[1]);
-        const nextHr = parseInt(next.time.split(':')[0]);
-        const nextMin = parseInt(next.time.split(':')[1]);
-
-        const diffMin = (nextHr * 60 + nextMin) - (curHr * 60 + curMin);
-        if (diffMin > 0 && diffMin < 45 && cur.transportType === 'flight') {
-          mockIssues.push({ type: 'Unrealistic Travel Time', message: `Only ${diffMin} minutes between arriving at flight and ${next.name}.` });
-        } else if (diffMin === 0) {
-          mockIssues.push({ type: 'Overlapping Activities', message: `${cur.name} and ${next.name} are scheduled at the exact same time.` });
-        }
+    // Missing lunch: only when the day actually runs through lunchtime
+    if (timed.length >= 2) {
+      const first = timed[0].minutes;
+      const last = timed[timed.length - 1].minutes;
+      const hasLunch = timed.some((a: any) => a.minutes >= 11 * 60 && a.minutes <= 14 * 60);
+      if (first < 11 * 60 && last > 14 * 60 && !hasLunch) {
+        issues.push({ type: 'Meal Skip', message: 'Nothing is planned between 11:00 and 14:00 — leave time for lunch.' });
       }
     }
 
-    const results = await queryGemini(prompt, mockIssues);
-    return NextResponse.json(results);
+    for (let i = 0; i < timed.length - 1; i++) {
+      const cur = timed[i];
+      const next = timed[i + 1];
+      const gap = next.minutes - cur.minutes;
+      if (gap === 0) {
+        issues.push({ type: 'Overlapping Activities', message: `${cur.name} and ${next.name} are both at ${cur.time}.` });
+      } else if (gap < 45 && cur.transportType === 'flight') {
+        issues.push({ type: 'Tight Schedule', message: `Only ${gap} minutes between ${cur.name} (flight) and ${next.name}.` });
+      }
+    }
+
+    return NextResponse.json(issues);
   } catch (err) {
     return errorResponse(err, 'Error in gap-check API:');
   }
 }
-

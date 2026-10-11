@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { apiRequest } from '@/utils/api';
+import React, { useState, useEffect, useCallback } from 'react';
+import { apiRequest, showError } from '@/utils/api';
 import { useAuth, UserProfile } from '@/context/AuthContext';
 import { Icon } from './Icon';
 
@@ -57,7 +57,70 @@ export const MembersModal: React.FC<MembersModalProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allUsers, members]);
 
+  // Invite links (owner only)
+  const isOwner = userRole === 'owner';
+  const [invites, setInvites] = useState<{ token: string; role: string; expiresAt: number }[]>([]);
+  const [linkRole, setLinkRole] = useState<'editor' | 'viewer'>('editor');
+  const [creatingLink, setCreatingLink] = useState(false);
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
+
+  const loadInvites = useCallback(async () => {
+    try {
+      setInvites(await apiRequest(`/trips/${tripId}/invites`));
+    } catch {
+      setInvites([]);
+    }
+  }, [tripId]);
+
+  useEffect(() => {
+    if (isOpen && isOwner) loadInvites();
+  }, [isOpen, isOwner, loadInvites]);
+
   if (!isOpen) return null;
+
+  const inviteUrl = (token: string) => `${window.location.origin}/?invite=${encodeURIComponent(token)}`;
+
+  const handleCreateLink = async () => {
+    setCreatingLink(true);
+    try {
+      await apiRequest(`/trips/${tripId}/invites`, {
+        method: 'POST',
+        body: JSON.stringify({ role: linkRole })
+      });
+      await loadInvites();
+    } catch (err) {
+      showError(err, "Couldn't create the invite link.");
+    } finally {
+      setCreatingLink(false);
+    }
+  };
+
+  // Phones: open the share sheet (LINE, WhatsApp…); otherwise copy to the clipboard
+  const handleShareLink = async (token: string) => {
+    const url = inviteUrl(token);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Join our trip', text: 'Join our trip on Travel Planner:', url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setCopiedToken(token);
+      setTimeout(() => setCopiedToken(null), 2000);
+    } catch (err) {
+      // Share sheet dismissed by the user is not an error
+      if ((err as any)?.name !== 'AbortError') showError(err, "Couldn't copy the link.");
+    }
+  };
+
+  const handleRevokeLink = async (token: string) => {
+    if (!window.confirm('Cancel this invite link? People who already joined stay in the trip.')) return;
+    try {
+      await apiRequest(`/trips/${tripId}/invites?token=${encodeURIComponent(token)}`, { method: 'DELETE' });
+      await loadInvites();
+    } catch (err) {
+      showError(err, "Couldn't cancel the invite link.");
+    }
+  };
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +165,6 @@ export const MembersModal: React.FC<MembersModalProps> = ({
     }
   };
 
-  const isOwner = userRole === 'owner';
 
   return (
     <div className="sheet-overlay" onClick={onClose}>
@@ -160,10 +222,63 @@ export const MembersModal: React.FC<MembersModalProps> = ({
           ))}
         </div>
 
-        {/* Invite Form (only for Trip Owners) */}
+        {/* Invite links (only for Trip Owners) */}
         {isOwner && (
           <section className="section">
-            <span className="eyebrow">Invite member</span>
+            <span className="eyebrow">Invite with a link</span>
+            <p style={{ fontSize: '13px' }}>
+              Send one link to your group chat. Friends open it, create a profile, and join this trip. Links work for 14 days.
+            </p>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <select
+                className="input"
+                value={linkRole}
+                onChange={(e) => setLinkRole(e.target.value as 'editor' | 'viewer')}
+              >
+                <option value="editor">Can edit the plan</option>
+                <option value="viewer">View only</option>
+              </select>
+              <button type="button" className="btn btn-primary" onClick={handleCreateLink} disabled={creatingLink}>
+                <Icon name="link" size={15} />
+                {creatingLink ? 'Creating…' : 'Create link'}
+              </button>
+            </div>
+
+            {invites.length > 0 && (
+              <div className="list">
+                {invites.map((inv) => (
+                  <div key={inv.token} className="list-row">
+                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                      <span className="list-title">{inv.role === 'editor' ? 'Can edit' : 'View only'}</span>
+                      <span className="list-sub">
+                        Expires {new Date(inv.expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <button type="button" className="btn btn-sm" onClick={() => handleShareLink(inv.token)}>
+                        {copiedToken === inv.token ? <><Icon name="check" size={14} /> Copied</> : 'Share link'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-icon danger"
+                        onClick={() => handleRevokeLink(inv.token)}
+                        title="Cancel link"
+                        aria-label="Cancel link"
+                      >
+                        <Icon name="x" size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Add an existing profile (only for Trip Owners) */}
+        {isOwner && (
+          <section className="section">
+            <span className="eyebrow">Add someone who already has a profile</span>
             {joinableUsers.length > 0 ? (
               <form onSubmit={handleInvite} className="form">
                 <div className="field">

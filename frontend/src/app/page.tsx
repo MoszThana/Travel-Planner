@@ -11,7 +11,9 @@ import { ExpenseSplit } from '@/components/ExpenseSplit';
 import { AIDrawer } from '@/components/AIDrawer';
 import { useAuth } from '@/context/AuthContext';
 import { LoginView } from '@/components/LoginView';
-import { apiRequest, getOfflineTrips, saveOfflineTrips } from '@/utils/api';
+import { apiRequest, showError } from '@/utils/api';
+
+const INVITE_KEY = 'pending_invite';
 
 export default function Home() {
   const { user, authLoading } = useAuth();
@@ -20,19 +22,31 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [activeTripDetails, setActiveTripDetails] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tripsError, setTripsError] = useState(false);
   const [tripLoadError, setTripLoadError] = useState(false);
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+
+  // An invite link (?invite=TOKEN) is remembered until the visitor has logged in
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const fromUrl = url.searchParams.get('invite');
+    if (fromUrl) {
+      sessionStorage.setItem(INVITE_KEY, fromUrl);
+      url.searchParams.delete('invite');
+      window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+    }
+    setInviteToken(fromUrl || sessionStorage.getItem(INVITE_KEY));
+  }, []);
 
   // Fetch all trips list
   const loadTrips = useCallback(async () => {
     if (!user) return;
+    setTripsError(false);
     try {
       const data = await apiRequest('/trips') as any[];
       setTrips(data);
-      // Sync offline cache
-      saveOfflineTrips(data);
     } catch {
-      console.warn('Backend server offline. Loading LocalStorage cached trips.');
-      setTrips(getOfflineTrips());
+      setTripsError(true);
     } finally {
       setLoading(false);
     }
@@ -45,16 +59,8 @@ export default function Home() {
       const data = await apiRequest(`/trips/${tripId}`) as any;
       setActiveTripDetails(data);
     } catch {
-      console.warn(`Fetching details for trip ${tripId} failed, loading LocalStorage backup.`);
-      const offlineList = getOfflineTrips();
-      const found = offlineList.find((t: any) => t.id === tripId);
-      // The cached trip list has no days/activities; only use a full offline copy
-      if (found && Array.isArray(found.days) && found.days.length > 0) {
-        setActiveTripDetails(found);
-      } else {
-        setActiveTripDetails(null);
-        setTripLoadError(true);
-      }
+      setActiveTripDetails(null);
+      setTripLoadError(true);
     }
   }, []);
 
@@ -62,6 +68,24 @@ export default function Home() {
   useEffect(() => {
     loadTrips();
   }, [loadTrips]);
+
+  // Once logged in, accept a pending invite and open that trip
+  useEffect(() => {
+    if (!user || !inviteToken) return;
+    (async () => {
+      try {
+        const res = await apiRequest(`/invites/${encodeURIComponent(inviteToken)}`, { method: 'POST' });
+        await loadTrips();
+        setActiveTripId(res.tripId);
+        setActiveTab('home');
+      } catch (err) {
+        showError(err, "Couldn't join the trip from this invite link.");
+      } finally {
+        sessionStorage.removeItem(INVITE_KEY);
+        setInviteToken(null);
+      }
+    })();
+  }, [user, inviteToken, loadTrips]);
 
   // Load trip details when trip selection changes
   useEffect(() => {
@@ -110,7 +134,7 @@ export default function Home() {
     }
 
     const activeUserMember = activeTripDetails?.members?.find((m: any) => m.id === user?.id);
-    const userRole = activeUserMember?.role || (activeTripDetails?.ownerId === user?.id ? 'owner' : 'viewer');
+    const userRole = activeUserMember?.role || 'viewer';
 
     switch (activeTab) {
       case 'home':
@@ -134,6 +158,7 @@ export default function Home() {
         return (
           <BudgetTracker
             trip={activeTripDetails}
+            onRefresh={handleRefresh}
             userRole={userRole}
           />
         );
@@ -163,7 +188,7 @@ export default function Home() {
   }
 
   if (!user) {
-    return <LoginView />;
+    return <LoginView inviteToken={inviteToken} />;
   }
 
   return (
@@ -173,7 +198,7 @@ export default function Home() {
         onTabChange={setActiveTab}
         onHome={handleBackToDashboard}
       />
-      
+
       {loading ? (
         <div className="empty">
           Loading…
@@ -184,6 +209,11 @@ export default function Home() {
           <main style={{ flex: 1 }}>{renderTabContent()}</main>
           <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
         </>
+      ) : tripsError ? (
+        <div className="empty">
+          Couldn&apos;t load your trips. Check your connection and try again.
+          <button className="btn btn-sm btn-primary" onClick={loadTrips}>Retry</button>
+        </div>
       ) : (
         // Trips list selection Dashboard mode
         <main style={{ flex: 1 }}>

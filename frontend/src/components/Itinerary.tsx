@@ -4,7 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useTranslation } from '@/context/TranslationContext';
 import { useAuth } from '@/context/AuthContext';
-import { apiRequest } from '@/utils/api';
+import { apiRequest, showError } from '@/utils/api';
+import { formatMoney } from '@/utils/money';
+import { useAiEnabled } from '@/utils/useAiEnabled';
 import styles from './Itinerary.module.css';
 import { AttachmentsModal } from './AttachmentsModal';
 import { MembersModal } from './MembersModal';
@@ -20,7 +22,10 @@ interface ItineraryProps {
 }
 
 export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, userRole = 'editor' }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const aiEnabled = useAiEnabled();
+  const currency = trip.currency || 'THB';
+  const money = (value: number) => formatMoney(value, currency, locale);
   const { user } = useAuth();
   const [activeDayIdx, setActiveDayIdx] = useState(0);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -310,20 +315,14 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
     trip.activities = mergedActivities;
 
     try {
-      // Send reorder to backend
       await apiRequest('/activities/reorder', {
         method: 'PUT',
         body: JSON.stringify({ items: updatedItems })
       });
-    } catch {
-      // Offline fallback
-      const offlineTrips = JSON.parse(localStorage.getItem('offline_trips') || '[]');
-      const offlineTrip = offlineTrips.find((t: any) => t.id === trip.id);
-      if (offlineTrip) {
-        offlineTrip.activities = mergedActivities;
-        localStorage.setItem('offline_trips', JSON.stringify(offlineTrips));
-      }
+    } catch (err) {
+      showError(err, "Couldn't save the new order.");
     }
+    // Reload either way so the list shows what is really saved
     onRefresh();
   };
 
@@ -365,30 +364,10 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
         });
       }
     } catch (err) {
-      console.warn('Saving activity offline...');
-      const offlineTrips = JSON.parse(localStorage.getItem('offline_trips') || '[]');
-      const offlineTrip = offlineTrips.find((t: any) => t.id === trip.id);
-      if (offlineTrip) {
-        offlineTrip.activities = offlineTrip.activities || [];
-        if (editingActivity) {
-          offlineTrip.activities = offlineTrip.activities.map((a: any) =>
-            a.id === editingActivity.id ? { ...a, ...payload } : a
-          );
-        } else {
-          offlineTrip.activities.push({
-            id: `act-${Date.now()}`,
-            ...payload,
-            actCost: 0,
-            visited: 0
-          });
-        }
-        localStorage.setItem('offline_trips', JSON.stringify(offlineTrips));
-      } else {
-        // Nowhere to keep it: leave the form open so nothing typed is lost
-        setFormError(err instanceof Error ? `Couldn't save: ${err.message}` : "Couldn't save the activity. Please try again.");
-        setSaving(false);
-        return;
-      }
+      // Leave the form open so nothing typed is lost
+      setFormError(err instanceof Error ? `Couldn't save: ${err.message}` : "Couldn't save the activity. Please try again.");
+      setSaving(false);
+      return;
     }
 
     setName('');
@@ -409,41 +388,19 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
 
     try {
       await apiRequest(`/activities/${activityId}`, { method: 'DELETE' });
-    } catch {
-      const offlineTrips = JSON.parse(localStorage.getItem('offline_trips') || '[]');
-      const offlineTrip = offlineTrips.find((t: any) => t.id === trip.id);
-      if (offlineTrip) {
-        offlineTrip.activities = offlineTrip.activities.filter((a: any) => a.id !== activityId);
-        localStorage.setItem('offline_trips', JSON.stringify(offlineTrips));
-      }
+      onRefresh();
+    } catch (err) {
+      showError(err, "Couldn't delete the activity.");
     }
-    onRefresh();
   };
 
   const handleAddDay = async () => {
     try {
       await apiRequest(`/trips/${trip.id}/days`, { method: 'POST' });
-    } catch {
-      const offlineTrips = JSON.parse(localStorage.getItem('offline_trips') || '[]');
-      const offlineTrip = offlineTrips.find((t: any) => t.id === trip.id);
-      if (offlineTrip) {
-        offlineTrip.days = offlineTrip.days || [];
-        const nextDayNum = offlineTrip.days.length + 1;
-        const lastDate = offlineTrip.days.length > 0 ? offlineTrip.days[offlineTrip.days.length - 1].date : Date.now();
-        const nextDate = new Date(lastDate);
-        nextDate.setDate(nextDate.getDate() + 1);
-
-        offlineTrip.days.push({
-          id: `day-${trip.id}-${nextDayNum}`,
-          tripId: trip.id,
-          dayNumber: nextDayNum,
-          date: nextDate.getTime()
-        });
-        offlineTrip.endDate = nextDate.getTime();
-        localStorage.setItem('offline_trips', JSON.stringify(offlineTrips));
-      }
+      onRefresh();
+    } catch (err) {
+      showError(err, "Couldn't add a day.");
     }
-    onRefresh();
   };
 
   // Visited / Check-in toggle with mobile-optimized modal details entry
@@ -466,20 +423,13 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
         method: 'PUT',
         body: JSON.stringify(updates)
       });
-    } catch {
-      const offlineTrips = JSON.parse(localStorage.getItem('offline_trips') || '[]');
-      const offlineTrip = offlineTrips.find((t: any) => t.id === trip.id);
-      if (offlineTrip) {
-        offlineTrip.activities = offlineTrip.activities.map((a: any) => 
-          a.id === act.id ? { ...a, ...updates } : a
-        );
-        localStorage.setItem('offline_trips', JSON.stringify(offlineTrips));
-      }
+      onRefresh();
+    } catch (err) {
+      showError(err, "Couldn't update the check-in.");
     }
-    onRefresh();
   };
 
-  // AI Cost Predictor Trigger
+  // AI Cost Predictor Trigger (only shown when AI is set up)
   const triggerCostPredictor = async (act: any) => {
     setLoadingAI(prev => ({ ...prev, [`cost-${act.id}`]: true }));
     try {
@@ -488,20 +438,18 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
         body: JSON.stringify({
           activityName: act.name,
           category: act.costCategory,
-          destination: trip.destination
+          destination: trip.destination,
+          currency
         })
       });
       setCostPredictions(prev => ({ ...prev, [act.id]: res }));
-    } catch {
-      setCostPredictions(prev => ({
-        ...prev,
-        [act.id]: { currency: 'THB', minPrice: act.estCost || 100, maxPrice: (act.estCost || 100) * 1.5, explanation: 'Simulation: typical cost for this activity.' }
-      }));
+    } catch (err) {
+      showError(err, "Couldn't get a cost estimate.");
     }
     setLoadingAI(prev => ({ ...prev, [`cost-${act.id}`]: false }));
   };
 
-  // AI Nearby Places Trigger
+  // AI Nearby Places Trigger (only shown when AI is set up)
   const triggerAIPoints = async (act: any) => {
     setLoadingAI(prev => ({ ...prev, [`rec-${act.id}`]: true }));
     try {
@@ -509,19 +457,12 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
         method: 'POST',
         body: JSON.stringify({
           destination: trip.destination,
-          activityName: act.name,
-          weather: 'Clear'
+          activityName: act.name
         })
       });
       setRecList(prev => ({ ...prev, [act.id]: res }));
-    } catch {
-      setRecList(prev => ({
-        ...prev,
-        [act.id]: [
-          { name: 'Local Coffee Spot', category: 'cafe', reason: 'Cozy retreat nearby' },
-          { name: 'Local Restaurant', category: 'food', reason: 'Try local specialties' }
-        ]
-      }));
+    } catch (err) {
+      showError(err, "Couldn't get suggestions.");
     }
     setLoadingAI(prev => ({ ...prev, [`rec-${act.id}`]: false }));
   };
@@ -699,31 +640,35 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
                               </label>
 
                               <div className={styles.costGroup}>
-                                <span className="chip tabular">Est. {Number(act.estCost || 0).toLocaleString()}</span>
+                                {act.estCost > 0 && (
+                                  <span className="chip tabular">Est. {money(act.estCost)}</span>
+                                )}
                                 {act.actCost > 0 && (
-                                  <span className="chip chip-accent tabular">Spent {Number(act.actCost).toLocaleString()}</span>
+                                  <span className="chip chip-accent tabular">Spent {money(act.actCost)}</span>
                                 )}
                               </div>
                             </div>
 
-                            {/* AI Action Hooks */}
-                            <div className={styles.aiActions}>
-                              <button className={styles.aiCardBtn} onClick={() => triggerCostPredictor(act)} disabled={loadingAI[`cost-${act.id}`]}>
-                                <Icon name="sparkles" size={13} />
-                                {loadingAI[`cost-${act.id}`] ? t('common.loading') : t('ai.cost_predictor')}
-                              </button>
-                              <button className={styles.aiCardBtn} onClick={() => triggerAIPoints(act)} disabled={loadingAI[`rec-${act.id}`]}>
-                                <Icon name="sparkles" size={13} />
-                                {loadingAI[`rec-${act.id}`] ? t('common.loading') : t('ai.recommendations')}
-                              </button>
-                            </div>
+                            {/* AI Action Hooks — only when Gemini is set up */}
+                            {aiEnabled && (
+                              <div className={styles.aiActions}>
+                                <button className={styles.aiCardBtn} onClick={() => triggerCostPredictor(act)} disabled={loadingAI[`cost-${act.id}`]}>
+                                  <Icon name="sparkles" size={13} />
+                                  {loadingAI[`cost-${act.id}`] ? t('common.loading') : t('ai.cost_predictor')}
+                                </button>
+                                <button className={styles.aiCardBtn} onClick={() => triggerAIPoints(act)} disabled={loadingAI[`rec-${act.id}`]}>
+                                  <Icon name="sparkles" size={13} />
+                                  {loadingAI[`rec-${act.id}`] ? t('common.loading') : t('ai.recommendations')}
+                                </button>
+                              </div>
+                            )}
 
                             {/* AI Prediction Outputs */}
                             {hasPrediction && (
                               <div className={styles.aiPredictBox}>
                                 <span className={styles.aiPredictTitle}>Estimated cost</span>
                                 <span className={styles.aiPredictValue}>
-                                  {costPredictions[act.id].minPrice} – {costPredictions[act.id].maxPrice} {costPredictions[act.id].currency}
+                                  {formatMoney(costPredictions[act.id].minPrice, costPredictions[act.id].currency || currency, locale)} – {formatMoney(costPredictions[act.id].maxPrice, costPredictions[act.id].currency || currency, locale)}
                                 </span>
                                 <span>{costPredictions[act.id].explanation}</span>
                               </div>

@@ -20,6 +20,8 @@ export const trips = sqliteTable('trips', {
   startDate: integer('start_date').notNull(),
   endDate: integer('end_date').notNull(),
   ownerId: text('owner_id').notNull().references(() => users.id),
+  budget: real('budget'), // shared target budget for the whole trip, in `currency`
+  currency: text('currency').notNull().default('THB'), // ISO 4217 code, e.g. THB, JPY
   createdAt: integer('created_at').notNull(),
 });
 
@@ -121,3 +123,14 @@ export const attachments = sqliteTable('attachments', {
 });
 
 
+
+// 12. Trip Invites (shareable join links)
+export const tripInvites = sqliteTable('trip_invites', {
+  token: text('token').primaryKey(), // random, unguessable; shared in the invite URL
+  tripId: text('trip_id').notNull().references(() => trips.id),
+  role: text('role').notNull(), // 'editor' | 'viewer'
+  createdBy: text('created_by').notNull().references(() => users.id),
+  createdAt: integer('created_at').notNull(),
+  expiresAt: integer('expires_at').notNull(),
+  revokedAt: integer('revoked_at'),
+});

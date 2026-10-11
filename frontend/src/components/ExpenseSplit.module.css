@@ -107,3 +107,19 @@
   width: 96px;
   text-align: right;
 }
+
+/* Expense list */
+.expenseText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.linkButton {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+}

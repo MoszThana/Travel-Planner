@@ -1,39 +1,42 @@
 import { GoogleGenAI } from '@google/genai';
+import { getRequestContext } from '@cloudflare/next-on-pages';
+
+// Gemini is optional. With no GEMINI_API_KEY the AI features are hidden in the app
+// and the AI routes answer 503 — they never return made-up answers.
 
 let aiClient: GoogleGenAI | null = null;
 
-function getAiClient() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return null;
+function getApiKey(): string | undefined {
+  try {
+    const key = (getRequestContext().env as any).GEMINI_API_KEY as string | undefined;
+    if (key) return key;
+  } catch {
+    // Outside a Cloudflare request context
   }
-  if (!aiClient) {
-    try {
-      aiClient = new GoogleGenAI({ apiKey });
-    } catch (err) {
-      console.error('Failed to initialize GoogleGenAI client:', err);
-      return null;
-    }
-  }
-  return aiClient;
+  return process.env.GEMINI_API_KEY;
 }
 
-export async function queryGemini(prompt: string, fallbackJson: any) {
-  const client = getAiClient();
-  if (client) {
-    try {
-      const response = await client.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-      });
-      const text = response.text || '';
-      
-      // Attempt to clean markdown backticks from JSON responses
-      const cleanJsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-      return JSON.parse(cleanJsonStr);
-    } catch (err) {
-      console.error('Gemini API call failed, using rule-based simulation:', err);
-    }
+export const isAiConfigured = (): boolean => !!getApiKey();
+
+export class AiUnavailableError extends Error {
+  readonly isAiUnavailable = true;
+}
+
+/** Ask Gemini for JSON. Throws AiUnavailableError if AI is not set up or the call fails. */
+export async function queryGemini<T = unknown>(prompt: string): Promise<T> {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new AiUnavailableError('AI is not set up.');
+  if (!aiClient) aiClient = new GoogleGenAI({ apiKey });
+
+  try {
+    const response = await aiClient.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: { responseMimeType: 'application/json' },
+    });
+    return JSON.parse(response.text || 'null') as T;
+  } catch (err) {
+    console.error('Gemini API call failed:', err);
+    throw new AiUnavailableError('The AI service did not answer. Please try again later.');
   }
-  return fallbackJson;
 }

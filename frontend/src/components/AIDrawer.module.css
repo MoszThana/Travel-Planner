@@ -28,6 +28,7 @@
 
 .weatherGrid {
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
   gap: 4px;
 }
 
@@ -46,6 +47,23 @@
 
 .weatherIcon {
   color: var(--text-muted);
+}
+
+.weatherDate {
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.weatherLow {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.weatherRain {
+  font-size: 11px;
+  color: var(--primary);
 }
 
 .weatherTemp {
@@ -184,6 +202,7 @@
 }
 
 .emgPhone {
+  text-decoration: none;
   font-size: 14px;
   font-weight: 600;
   color: var(--accent);

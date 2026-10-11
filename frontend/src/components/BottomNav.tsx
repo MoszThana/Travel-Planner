@@ -20,7 +20,7 @@ export const useNavItems = (): { id: TabType; label: string; icon: IconName }[] 
     { id: 'map', label: t('nav.map'), icon: 'map' },
     { id: 'budget', label: t('nav.budget'), icon: 'wallet' },
     { id: 'group', label: t('nav.group'), icon: 'users' },
-    { id: 'ai', label: t('nav.ai_assistant'), icon: 'sparkles' },
+    { id: 'ai', label: t('nav.trip_info'), icon: 'info' },
   ];
 };
 

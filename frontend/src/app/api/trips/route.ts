@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
 import { requireUser, errorResponse } from '@/lib/access';
+import { CURRENCY_CODES } from '@/utils/money';
 
 export const runtime = 'edge';
 
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
 
     const body = await request.json() as any;
     const { name, destination, startDate, endDate } = body;
+    const currency = CURRENCY_CODES.includes(body.currency) ? body.currency : 'THB';
 
     if (!name || !destination || !startDate || !endDate) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -79,6 +81,7 @@ export async function POST(request: Request) {
         startDate: start.getTime(),
         endDate: end.getTime(),
         ownerId: userId,
+        currency,
         createdAt: now
       }),
       db.insert(schema.tripMembers).values({

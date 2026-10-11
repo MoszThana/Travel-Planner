@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq, inArray } from 'drizzle-orm';
 import { requireUser, requireTripRole, errorResponse } from '@/lib/access';
+import { CURRENCY_CODES } from '@/utils/money';
 
 export const runtime = 'edge';
 
@@ -73,5 +74,44 @@ export async function GET(
     });
   } catch (err) {
     return errorResponse(err, `Error fetching trip ${id}:`);
+  }
+}
+
+// PATCH /api/trips/[id] - Update shared trip settings: budget and currency (trip editors)
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  try {
+    const userId = await requireUser(request);
+    const db = await getSafeDb();
+    await requireTripRole(db, id, userId, 'editor');
+
+    const body = await request.json() as any;
+    const updates: { budget?: number | null; currency?: string } = {};
+
+    if (body.budget !== undefined) {
+      const budget = body.budget === null || body.budget === '' ? null : Number(body.budget);
+      if (budget !== null && (!Number.isFinite(budget) || budget < 0)) {
+        return NextResponse.json({ error: 'Budget must be a positive number.' }, { status: 400 });
+      }
+      updates.budget = budget;
+    }
+    if (body.currency !== undefined) {
+      if (!CURRENCY_CODES.includes(body.currency)) {
+        return NextResponse.json({ error: 'Unsupported currency.' }, { status: 400 });
+      }
+      updates.currency = body.currency;
+    }
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
+    }
+
+    await db.update(schema.trips).set(updates).where(eq(schema.trips.id, id));
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    return errorResponse(err, `Error updating trip ${id}:`);
   }
 }

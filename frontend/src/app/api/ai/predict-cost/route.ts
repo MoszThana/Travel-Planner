@@ -1,36 +1,27 @@
 import { NextResponse } from 'next/server';
-import { queryGemini } from '@/utils/aiHelper';
+import { queryGemini, isAiConfigured } from '@/utils/aiHelper';
 import { requireUser, errorResponse } from '@/lib/access';
 
 export const runtime = 'edge';
 
-// POST /api/ai/predict-cost - Predict cost range of activities
+// POST /api/ai/predict-cost - Estimated cost range for an activity (only when Gemini is set up)
 export async function POST(request: Request) {
   try {
     await requireUser(request);
+    if (!isAiConfigured()) {
+      return NextResponse.json({ error: 'AI is not set up.' }, { status: 503 });
+    }
+
     const body = await request.json() as any;
-    const { activityName, category, destination } = body;
+    const { activityName, category, destination, currency } = body;
 
-    const prompt = `Predict the estimated cost range in local currency for visiting "${activityName}" (category: ${category}) in "${destination}". Include tickets, average meals, or transport if applicable.
-Return ONLY a JSON object. Example:
-{
-  "currency": "USD",
-  "minPrice": 15,
-  "maxPrice": 45,
-  "explanation": "Entry ticket is $15. Budget $30 for a meal or guide fee."
-}`;
+    const prompt = `Estimate the typical cost range for one person visiting "${activityName}" (category: ${category}) in "${destination}". Include tickets, average meals, or transport if applicable.
+Answer in ${currency || 'the local currency'}. Return a JSON object with keys "currency", "minPrice", "maxPrice" (numbers) and "explanation" (one short sentence).`;
 
-    const mockPrediction = {
-      currency: destination.toLowerCase().includes('thailand') || destination.toLowerCase().includes('bangkok') ? 'THB' : 'USD',
-      minPrice: category === 'hotel' ? 1200 : category === 'food' ? 150 : category === 'transport' ? 80 : 250,
-      maxPrice: category === 'hotel' ? 3500 : category === 'food' ? 450 : category === 'transport' ? 250 : 700,
-      explanation: `Predicted based on average tourist costs in ${destination} for ${category} activities.`
-    };
-
-    const results = await queryGemini(prompt, mockPrediction);
-    return NextResponse.json(results);
-  } catch (err) {
+    const result = await queryGemini(prompt);
+    return NextResponse.json(result);
+  } catch (err: any) {
+    if (err?.isAiUnavailable) return NextResponse.json({ error: err.message }, { status: 503 });
     return errorResponse(err, 'Error in predict-cost API:');
   }
 }
-

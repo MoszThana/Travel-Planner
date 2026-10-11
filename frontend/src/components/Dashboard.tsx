@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { useTranslation } from '@/context/TranslationContext';
 import { useAuth } from '@/context/AuthContext';
-import { apiRequest } from '@/utils/api';
+import { apiRequest, showError } from '@/utils/api';
+import { CURRENCIES } from '@/utils/money';
 import styles from './Dashboard.module.css';
 import { Icon } from './Icon';
 
@@ -22,6 +23,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ trips, onTripSelect, onRef
   const [destination, setDestination] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [currency, setCurrency] = useState('THB');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,7 +41,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ trips, onTripSelect, onRef
     }
 
     try {
-      // 1. Try backend
       await apiRequest('/trips', {
         method: 'POST',
         body: JSON.stringify({
@@ -47,61 +48,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ trips, onTripSelect, onRef
           destination,
           startDate: startMs,
           endDate: endMs,
-          ownerId: user.id
+          currency
         })
       });
     } catch (err) {
-      console.warn('Backend save failed, saving to LocalStorage fallback.');
-      
-      // 2. LocalStorage fallback
-      const offlineTrips = JSON.parse(localStorage.getItem('offline_trips') || '[]');
-      const tripId = `trip-${Date.now()}`;
-      
-      // Calculate days
-      const days: any[] = [];
-      const diffTime = Math.abs(endMs - startMs);
-      const diffDays = Math.ceil(diffTime / (86400000)) + 1;
-      for (let i = 1; i <= diffDays; i++) {
-        const d = new Date(startMs);
-        d.setDate(d.getDate() + (i - 1));
-        days.push({
-          id: `day-${tripId}-${i}`,
-          tripId,
-          dayNumber: i,
-          date: d.getTime()
-        });
-      }
-
-      const newTrip = {
-        id: tripId,
-        name,
-        destination,
-        startDate: startMs,
-        endDate: endMs,
-        ownerId: user.id,
-        createdAt: Date.now(),
-        days,
-        activities: [],
-        members: [
-          { ...user, role: 'owner' },
-          { id: 'user-somchai', name: 'Somchai', email: 'somchai@example.com', avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Somchai', role: 'editor' },
-          { id: 'user-jane', name: 'Jane', email: 'jane@example.com', avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Jane', role: 'editor' },
-          { id: 'user-david', name: 'David', email: 'david@example.com', avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=David', role: 'viewer' }
-        ],
-        expenses: [],
-        splits: [],
-        emergency: [],
-        votes: []
-      };
-
-      offlineTrips.push(newTrip);
-      localStorage.setItem('offline_trips', JSON.stringify(offlineTrips));
+      showError(err, "Couldn't create the trip.");
+      setLoading(false);
+      return;
     }
 
     setName('');
     setDestination('');
     setStartDate('');
     setEndDate('');
+    setCurrency('THB');
     setShowForm(false);
     setLoading(false);
     onRefresh();
@@ -243,6 +203,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ trips, onTripSelect, onRef
                 onChange={(e) => setEndDate(e.target.value)}
               />
             </div>
+          </div>
+
+          <div className="field">
+            <label className="label">Currency</label>
+            <select className="input" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+              {CURRENCIES.map((c) => (
+                <option key={c.code} value={c.code}>{c.code} · {c.label}</option>
+              ))}
+            </select>
           </div>
 
           <div className="btn-row">
