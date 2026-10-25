@@ -5,6 +5,8 @@ import { useTranslation } from '@/context/TranslationContext';
 import { apiRequest, showError } from '@/utils/api';
 import { formatMoney, CURRENCIES } from '@/utils/money';
 import styles from './BudgetTracker.module.css';
+import { CountUp } from './Motion';
+import { Gauge, DayChart, DayPoint } from './Charts';
 
 interface BudgetTrackerProps {
   trip: any;
@@ -102,8 +104,20 @@ export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, onRefresh, u
   const remaining = targetBudget - totalAct;
   const isOverBudget = hasBudget && remaining < 0;
 
-  // Progress Bar percentage
-  const percent = hasBudget ? Math.min((totalAct / targetBudget) * 100, 100) : 0;
+  // Category shares are of the category total (spent, or planned where nothing is spent yet)
+  const categorySum = Object.values(categoryTotals).reduce((sum, v) => sum + v, 0);
+
+  // Planned vs spent per day, from activity costs (group expenses have no day)
+  const dayData: DayPoint[] = (trip.days || []).map((d: any) => {
+    const acts = (trip.activities || []).filter((a: any) => a.dayId === d.id);
+    return {
+      label: t('itinerary.day', { number: d.dayNumber }),
+      sublabel: new Date(d.date).toLocaleDateString(locale === 'th' ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short' }),
+      planned: acts.reduce((sum: number, a: any) => sum + (a.estCost || 0), 0),
+      spent: acts.reduce((sum: number, a: any) => sum + (a.actCost || 0), 0),
+    };
+  });
+  const hasDayCosts = dayData.some((d) => d.planned > 0 || d.spent > 0);
 
   return (
     <div className="page">
@@ -128,23 +142,18 @@ export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, onRefresh, u
 
       <div className="split">
       {/* Summary */}
-      <div className={`card ${styles.summaryCard}`}>
+      <div className={`card lift ${styles.summaryCard}`}>
         <div className={styles.gaugeHeader}>
           <span className="eyebrow">{t('budget.actual_spent')}</span>
-          <span className={styles.gaugeValue}>{money(totalAct)}</span>
+          <CountUp value={totalAct} format={money} className={styles.gaugeValue} />
         </div>
 
         {hasBudget && (
-          <div className={styles.progressBar}>
-            <div
-              className={`${styles.progressFill} ${isOverBudget ? styles.progressFillAlert : ''}`}
-              style={{ width: `${percent}%` }}
-            />
-          </div>
+          <Gauge value={totalAct} max={targetBudget} caption={`of ${money(targetBudget)} budget`} />
         )}
 
         <div className={styles.targetRow}>
-          <span>{hasBudget ? `${Math.round(percent)}% of the group budget` : 'Set a budget for the whole group'}</span>
+          <span>{hasBudget ? 'Group budget for the whole trip' : 'Set a budget for the whole group'}</span>
           <label className={styles.targetField}>
             Budget
             <input
@@ -165,31 +174,31 @@ export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, onRefresh, u
         <div className={styles.spentStats}>
           <div className={styles.statItem}>
             <span className={styles.statLabel}>{t('budget.remaining')}</span>
-            <span className={`${styles.statValue} ${!hasBudget ? '' : isOverBudget ? styles.statNegative : styles.statPositive}`}>
-              {hasBudget ? money(remaining) : '—'}
-            </span>
+            {hasBudget
+              ? <CountUp value={remaining} format={money} className={`${styles.statValue} ${isOverBudget ? styles.statNegative : styles.statPositive}`} />
+              : <span className={styles.statValue}>—</span>}
           </div>
           <div className={styles.statItem}>
             <span className={styles.statLabel}>Planned</span>
-            <span className={styles.statValue}>{money(totalEst)}</span>
+            <CountUp value={totalEst} format={money} className={styles.statValue} />
           </div>
           <div className={styles.statItem}>
             <span className={styles.statLabel}>{t('budget.daily_average')}</span>
-            <span className={styles.statValue}>{money(Math.round(costPerDay))}</span>
+            <CountUp value={Math.round(costPerDay)} format={money} className={styles.statValue} />
           </div>
           <div className={styles.statItem}>
             <span className={styles.statLabel}>{t('budget.cost_per_person')}</span>
-            <span className={styles.statValue}>{money(Math.round(costPerPerson))}</span>
+            <CountUp value={Math.round(costPerPerson)} format={money} className={styles.statValue} />
           </div>
         </div>
       </div>
 
       {/* Category Breakdown */}
       <section className="section">
-        <span className="eyebrow">By category</span>
-        <div className="list">
+        <span className="eyebrow">By category · spent, or planned if not paid yet</span>
+        <div className="list lift">
           {Object.entries(categoryTotals).map(([cat, amount]) => {
-            const catPercent = totalAct > 0 ? (amount / totalAct) * 100 : 0;
+            const catPercent = categorySum > 0 ? (amount / categorySum) * 100 : 0;
             const color = CATEGORY_COLORS[cat] || CATEGORY_COLORS.other;
 
             return (
@@ -216,6 +225,20 @@ export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, onRefresh, u
         </div>
       </section>
       </div>
+
+      {/* Planned vs spent per day */}
+      <section className="section">
+        <span className="eyebrow">Per day · activity costs</span>
+        <div className="card lift">
+          {hasDayCosts ? (
+            <DayChart data={dayData} format={money} />
+          ) : (
+            <p style={{ fontSize: '14px' }}>
+              Add estimated costs to activities (and the real amount when you check in) to see planned vs spent for each day.
+            </p>
+          )}
+        </div>
+      </section>
     </div>
   );
 };

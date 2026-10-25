@@ -565,7 +565,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
                             </span>
                           </div>
 
-                          <div className={`${styles.activityCard} ${isVisited ? styles.activityCardVisited : ''}`}>
+                          <div className={`${styles.activityCard} lift ${isVisited ? styles.activityCardVisited : ''}`}>
                             <div className={styles.cardHeader}>
                               <h3 className={`${styles.cardTitle} ${isVisited ? styles.cardTitleVisited : ''}`}>
                                 {act.name}

@@ -21,26 +21,16 @@
   padding: 22px;
   text-align: left;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.7);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   color: inherit;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
 
 @media (min-width: 900px) {
   .tripCard { padding: 28px; }
 }
 
-.tripCard:hover {
-  border-color: var(--primary-light);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
-}
-
-.tripCard:active {
-  transform: scale(0.99);
-}
 
 .cardTop {
   display: flex;
@@ -54,8 +44,8 @@
   width: 56px;
   height: 56px;
   border-radius: var(--radius-sm);
-  background: var(--primary-soft);
-  color: var(--primary);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -103,7 +93,7 @@
   align-items: center;
   gap: 6px;
   font-size: 14px;
-  color: var(--text-muted);
+  color: var(--hero-muted);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -112,13 +102,13 @@
 .tripMeta {
   margin-top: auto;
   padding-top: 14px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid rgba(23, 22, 31, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--hero-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -145,4 +135,11 @@
   max-width: 640px;
   padding: 24px;
   gap: 16px;
+}
+
+/* Dark mode: pastel tints are deep, so soften the white accents */
+@media (prefers-color-scheme: dark) {
+  .tripCard { border-color: rgba(255, 255, 255, 0.06); }
+  .dateTile { background: rgba(255, 255, 255, 0.08); }
+  .tripMeta { border-top-color: rgba(255, 255, 255, 0.08); }
 }

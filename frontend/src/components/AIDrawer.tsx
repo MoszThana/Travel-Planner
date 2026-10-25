@@ -171,7 +171,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ trip, onRefresh, userRole = 
         <span className="eyebrow">
           Weather{weather && 'place' in weather ? ` · ${weather.place}` : ''}
         </span>
-        <div className="card">
+        <div className="card lift">
           {weatherError ? (
             <p style={{ fontSize: '14px' }}>{weatherError}</p>
           ) : !weather ? (

@@ -5,6 +5,15 @@ import { useTranslation } from '@/context/TranslationContext';
 import { useAuth } from '@/context/AuthContext';
 import { apiRequest, showError } from '@/utils/api';
 import { CURRENCIES } from '@/utils/money';
+import { CountUp } from './Motion';
+
+// Each trip keeps the same pastel colour (picked from its id)
+const PASTELS = ['purple', 'blue', 'green', 'pink', 'peach', 'yellow'];
+const pastelFor = (id: string) => {
+  let hash = 0;
+  for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return `var(--pastel-${PASTELS[hash % PASTELS.length]})`;
+};
 import styles from './Dashboard.module.css';
 import { Icon } from './Icon';
 
@@ -121,18 +130,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ trips, onTripSelect, onRef
           <p className="hero-text">{t('dashboard.hero_text')}</p>
         </div>
 
-        <div className="hero-stats">
+        <div className="hero-stats stagger">
           <div className="hero-stat">
             <span className="hero-stat-label">{t('dashboard.stat_total')}</span>
-            <span className="hero-stat-value">{trips.length}</span>
+            <CountUp value={trips.length} className="hero-stat-value" />
           </div>
           <div className="hero-stat">
             <span className="hero-stat-label">{t('dashboard.stat_upcoming')}</span>
-            <span className="hero-stat-value highlight">{upcomingTrips.length}</span>
+            <CountUp value={upcomingTrips.length} className="hero-stat-value highlight" />
           </div>
           <div className="hero-stat">
             <span className="hero-stat-label">{t('dashboard.stat_days')}</span>
-            <span className="hero-stat-value">{totalDays}</span>
+            <CountUp value={totalDays} className="hero-stat-value" />
           </div>
           <div className="hero-stat">
             <span className="hero-stat-label">{t('dashboard.stat_next')}</span>
@@ -224,7 +233,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ trips, onTripSelect, onRef
           </div>
         </form>
       ) : (
-        <div className={styles.tripList}>
+        <div className={`${styles.tripList} stagger`}>
           {trips.length === 0 ? (
             <div className="empty">
               <Icon name="map" size={28} />
@@ -236,7 +245,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ trips, onTripSelect, onRef
               const status = getStatus(trip);
               const start = new Date(trip.startDate);
               return (
-                <button key={trip.id} className={styles.tripCard} onClick={() => onTripSelect(trip.id)}>
+                <button
+                  key={trip.id}
+                  className={`${styles.tripCard} lift`}
+                  style={{ background: pastelFor(trip.id) }}
+                  onClick={() => onTripSelect(trip.id)}
+                >
                   <div className={styles.cardTop}>
                     <div className={styles.dateTile}>
                       <span className={styles.dateMonth}>

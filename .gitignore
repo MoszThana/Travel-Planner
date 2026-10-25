@@ -31,3 +31,7 @@ dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Reference media (not part of the app)
+*.mp4
+*.mov
