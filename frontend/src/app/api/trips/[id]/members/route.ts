@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq, and } from 'drizzle-orm';
 import { requireUser, requireTripRole, errorResponse } from '@/lib/access';
+import { logEvent } from '@/lib/events';
 
 export const runtime = 'edge';
 
@@ -30,7 +31,7 @@ export async function POST(
       return NextResponse.json({ error: "The owner's role can't be changed." }, { status: 400 });
     }
 
-    const userCheck = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+    const userCheck = await db.select({ id: schema.users.id, name: schema.users.name }).from(schema.users).where(eq(schema.users.id, userId)).limit(1);
     if (userCheck.length === 0) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
     }
@@ -42,6 +43,7 @@ export async function POST(
 
     if (existing.length > 0) {
       await db.update(schema.tripMembers).set({ role }).where(eq(schema.tripMembers.id, existing[0].id));
+      await logEvent(db, tripId, currentUserId, 'member.role_changed', `${userCheck[0].name} → ${role}`);
       return NextResponse.json({ success: true, updated: true });
     }
 
@@ -52,6 +54,7 @@ export async function POST(
       role,
       joinedAt: Date.now()
     });
+    await logEvent(db, tripId, currentUserId, 'member.added', `${userCheck[0].name} (${role})`);
     return NextResponse.json({ success: true, added: true });
   } catch (err) {
     return errorResponse(err, 'Error managing trip member:');
@@ -80,8 +83,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Cannot remove the owner of the trip' }, { status: 400 });
     }
 
+    const [removed] = await db.select({ name: schema.users.name }).from(schema.users).where(eq(schema.users.id, userId)).limit(1);
     await db.delete(schema.tripMembers)
       .where(and(eq(schema.tripMembers.tripId, tripId), eq(schema.tripMembers.userId, userId)));
+    await logEvent(db, tripId, currentUserId, 'member.removed', removed?.name || 'a member');
 
     return NextResponse.json({ success: true });
   } catch (err) {

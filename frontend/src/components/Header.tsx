@@ -12,10 +12,12 @@ interface HeaderProps {
   activeTab?: TabType;
   onTabChange?: (tab: TabType) => void;
   onHome?: () => void;
+  // Bell for the open trip's "What's new" list
+  whatsNew?: { unread: number; onOpen: () => void };
 }
 
-export const Header: React.FC<HeaderProps> = ({ activeTab, onTabChange, onHome }) => {
-  const { locale, setLocale } = useTranslation();
+export const Header: React.FC<HeaderProps> = ({ activeTab, onTabChange, onHome, whatsNew }) => {
+  const { t, locale, setLocale } = useTranslation();
   const { user, logout } = useAuth();
   const navItems = useNavItems();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -40,7 +42,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, onTabChange, onHome }
   return (
     <header className={styles.header}>
       <div className={styles.inner}>
-        <button className={styles.brand} onClick={onHome} aria-label="Travel Planner home">
+        <button className={styles.brand} onClick={onHome} aria-label={t('header.home')}>
           <span className={styles.brandMark}>
             <Icon name="pin" size={18} strokeWidth={2.25} />
           </span>
@@ -67,6 +69,19 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, onTabChange, onHome }
         )}
 
         <div className={styles.rightSection}>
+          {whatsNew && (
+            <button
+              type="button"
+              className={styles.bellBtn}
+              onClick={whatsNew.onOpen}
+              aria-label={whatsNew.unread > 0 ? t('whatsnew.bell_unread', { count: whatsNew.unread }) : t('whatsnew.title')}
+              title={t('whatsnew.title')}
+            >
+              <Icon name="bell" size={18} />
+              {whatsNew.unread > 0 && <span className={styles.bellBadge}>{whatsNew.unread > 9 ? '9+' : whatsNew.unread}</span>}
+            </button>
+          )}
+
           <div className={`segmented ${styles.langToggle}`}>
             <button className={locale === 'en' ? 'active' : ''} onClick={() => setLocale('en')}>
               EN
@@ -81,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, onTabChange, onHome }
               <button
                 className={`${styles.avatarBtn} ${dropdownOpen ? styles.avatarBtnActive : ''}`}
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                aria-label="Switch User Profile"
+                aria-label={t('header.profile_menu')}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={user.avatarUrl} alt={user.name} className={styles.avatarImage} />
@@ -105,7 +120,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, onTabChange, onHome }
                     }}
                   >
                     <Icon name="logout" size={15} />
-                    Log out / switch profile
+                    {t('header.logout')}
                   </button>
                 </div>
               )}

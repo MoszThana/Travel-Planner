@@ -4,13 +4,16 @@ import React, { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useTranslation } from '@/context/TranslationContext';
 import { useAuth } from '@/context/AuthContext';
-import { apiRequest, showError } from '@/utils/api';
+import { apiRequest, showError, showSuccess } from '@/utils/api';
 import { formatMoney } from '@/utils/money';
 import { useAiEnabled } from '@/utils/useAiEnabled';
 import styles from './Itinerary.module.css';
 import { AttachmentsModal } from './AttachmentsModal';
 import { MembersModal } from './MembersModal';
 import { Icon, TRANSPORT_ICONS } from './Icon';
+import { confirmDialog } from './Feedback';
+import { CheckInSheet } from './CheckInSheet';
+import { timeAgo } from '@/utils/time';
 import { GoogleMapEmbed } from './GoogleMapEmbed';
 import { hasPoint, googleDirectionsUrl, googlePlaceUrl } from '@/utils/maps';
 
@@ -34,6 +37,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
   const [isMounted, setIsMounted] = useState(false);
   const [editingActivity, setEditingActivity] = useState<any | null>(null);
   const [openMaps, setOpenMaps] = useState<Record<string, boolean>>({});
+  const [checkinActivity, setCheckinActivity] = useState<any | null>(null);
 
   // Form Fields
   const [name, setName] = useState('');
@@ -320,7 +324,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
         body: JSON.stringify({ items: updatedItems })
       });
     } catch (err) {
-      showError(err, "Couldn't save the new order.");
+      showError(err, t('itinerary.reorder_failed'));
     }
     // Reload either way so the list shows what is really saved
     onRefresh();
@@ -331,7 +335,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
     setFormError('');
     if (!name) return;
     if (!activeDay) {
-      setFormError('This trip has no days loaded yet. Go back and open the trip again, or add a day first.');
+      setFormError(t('itinerary.no_days'));
       return;
     }
 
@@ -365,7 +369,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
       }
     } catch (err) {
       // Leave the form open so nothing typed is lost
-      setFormError(err instanceof Error ? `Couldn't save: ${err.message}` : "Couldn't save the activity. Please try again.");
+      setFormError(t('itinerary.save_failed', { error: err instanceof Error ? err.message : '' }));
       setSaving(false);
       return;
     }
@@ -384,13 +388,13 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
   };
 
   const handleDeleteActivity = async (activityId: string) => {
-    if (!window.confirm(t('common.confirm') + ' ' + t('common.delete') + '?')) return;
+    if (!(await confirmDialog({ message: t('itinerary.delete_confirm'), confirmLabel: t('common.delete'), cancelLabel: t('common.cancel'), danger: true }))) return;
 
     try {
       await apiRequest(`/activities/${activityId}`, { method: 'DELETE' });
       onRefresh();
     } catch (err) {
-      showError(err, "Couldn't delete the activity.");
+      showError(err, t('itinerary.delete_failed'));
     }
   };
 
@@ -399,33 +403,24 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
       await apiRequest(`/trips/${trip.id}/days`, { method: 'POST' });
       onRefresh();
     } catch (err) {
-      showError(err, "Couldn't add a day.");
+      showError(err, t('itinerary.add_day_failed'));
     }
   };
 
-  // Visited / Check-in toggle with mobile-optimized modal details entry
+  // Check-in opens a small form; un-checking is one tap
   const handleCheckinToggle = async (act: any) => {
-    const isVisited = act.visited === 1;
-    let updates: any = { visited: isVisited ? 0 : 1 };
-
-    if (!isVisited) {
-      const actTime = window.prompt('Check-in: Actual arrival time (HH:MM)?', act.time || '');
-      const actCostVal = window.prompt('Check-in: Actual spending amount?', act.estCost ? String(act.estCost) : '0');
-      const actNote = window.prompt('Check-in: Add any actual arrival notes?', act.notes || '');
-
-      if (actTime !== null) updates.time = actTime;
-      if (actCostVal !== null) updates.actCost = parseFloat(actCostVal) || 0;
-      if (actNote !== null) updates.notes = actNote;
+    if (act.visited !== 1) {
+      setCheckinActivity(act);
+      return;
     }
-
     try {
       await apiRequest(`/activities/${act.id}`, {
         method: 'PUT',
-        body: JSON.stringify(updates)
+        body: JSON.stringify({ visited: 0 })
       });
       onRefresh();
     } catch (err) {
-      showError(err, "Couldn't update the check-in.");
+      showError(err, t('checkin.error'));
     }
   };
 
@@ -444,7 +439,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
       });
       setCostPredictions(prev => ({ ...prev, [act.id]: res }));
     } catch (err) {
-      showError(err, "Couldn't get a cost estimate.");
+      showError(err, t('itinerary.ai_failed'));
     }
     setLoadingAI(prev => ({ ...prev, [`cost-${act.id}`]: false }));
   };
@@ -462,7 +457,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
       });
       setRecList(prev => ({ ...prev, [act.id]: res }));
     } catch (err) {
-      showError(err, "Couldn't get suggestions.");
+      showError(err, t('itinerary.ai_failed'));
     }
     setLoadingAI(prev => ({ ...prev, [`rec-${act.id}`]: false }));
   };
@@ -477,11 +472,11 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
         <div className={styles.topActions}>
           <button className="btn btn-sm" onClick={() => setShowMembersModal(true)}>
             <Icon name="users" size={15} />
-            Members
+            {t('itinerary.members')}
           </button>
           <button className="btn btn-sm" onClick={() => setShowAttachmentsModal(true)}>
             <Icon name="paperclip" size={15} />
-            Files
+            {t('itinerary.files')}
           </button>
         </div>
       </div>
@@ -501,12 +496,12 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
           >
             {t('itinerary.day', { number: d.dayNumber })}
             <span className={styles.dayDate}>
-              {new Date(d.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+              {new Date(d.date).toLocaleDateString(locale === 'th' ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short' })}
             </span>
           </button>
         ))}
         {userRole !== 'viewer' && (
-          <button className="pill-tab dashed" onClick={handleAddDay} aria-label="Add day">
+          <button className="pill-tab dashed" onClick={handleAddDay} aria-label={t('itinerary.add_day')}>
             <Icon name="plus" size={14} />
           </button>
         )}
@@ -595,6 +590,17 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
                               </span>
                             </div>
 
+                            {act.updatedBy && act.updatedAt && (
+                              <span className={styles.updatedBy}>
+                                {t('itinerary.updated_by', {
+                                  name: act.updatedBy === user?.id
+                                    ? t('whatsnew.you')
+                                    : trip.members?.find((m: any) => m.id === act.updatedBy)?.name || t('whatsnew.someone'),
+                                  time: timeAgo(act.updatedAt, locale),
+                                })}
+                              </span>
+                            )}
+
                             {act.notes && (
                               <p className={styles.notes}>{act.notes}</p>
                             )}
@@ -609,7 +615,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
                                   className="btn btn-sm btn-primary"
                                 >
                                   <Icon name="route" size={15} />
-                                  Navigate
+                                  {t('itinerary.navigate')}
                                 </a>
                                 <button
                                   className="btn btn-sm"
@@ -617,7 +623,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
                                   aria-expanded={!!openMaps[act.id]}
                                 >
                                   <Icon name="map" size={15} />
-                                  {openMaps[act.id] ? 'Hide map' : 'Show map'}
+                                  {openMaps[act.id] ? t('itinerary.hide_map') : t('itinerary.show_map')}
                                 </button>
                               </div>
                             )}
@@ -641,10 +647,10 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
 
                               <div className={styles.costGroup}>
                                 {act.estCost > 0 && (
-                                  <span className="chip tabular">Est. {money(act.estCost)}</span>
+                                  <span className="chip tabular">{t('itinerary.est', { amount: money(act.estCost) })}</span>
                                 )}
                                 {act.actCost > 0 && (
-                                  <span className="chip chip-accent tabular">Spent {money(act.actCost)}</span>
+                                  <span className="chip chip-accent tabular">{t('itinerary.spent', { amount: money(act.actCost) })}</span>
                                 )}
                               </div>
                             </div>
@@ -666,7 +672,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
                             {/* AI Prediction Outputs */}
                             {hasPrediction && (
                               <div className={styles.aiPredictBox}>
-                                <span className={styles.aiPredictTitle}>Estimated cost</span>
+                                <span className={styles.aiPredictTitle}>{t('itinerary.ai_cost_title')}</span>
                                 <span className={styles.aiPredictValue}>
                                   {formatMoney(costPredictions[act.id].minPrice, costPredictions[act.id].currency || currency, locale)} – {formatMoney(costPredictions[act.id].maxPrice, costPredictions[act.id].currency || currency, locale)}
                                 </span>
@@ -677,7 +683,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
                             {/* AI Recommendations Outputs */}
                             {hasRecs && (
                               <div className={styles.aiPredictBox}>
-                                <span className={styles.aiPredictTitle}>Nearby highlights</span>
+                                <span className={styles.aiPredictTitle}>{t('itinerary.ai_recs_title')}</span>
                                 <ul className={styles.recList}>
                                   {recList[act.id].map((rec, i) => (
                                     <li key={i}>
@@ -714,7 +720,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
         <div className="sheet-overlay" onClick={handleCloseForm}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <div className="sheet-head">
-              <h2 className="sheet-title">{editingActivity ? 'Edit activity' : t('itinerary.add_activity')}</h2>
+              <h2 className="sheet-title">{editingActivity ? t('itinerary.edit_activity') : t('itinerary.add_activity')}</h2>
               <button type="button" className="btn-icon" onClick={handleCloseForm} aria-label={t('common.cancel')}>
                 <Icon name="x" size={18} />
               </button>
@@ -726,7 +732,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
                   type="text"
                   required
                   className="input"
-                  placeholder="e.g., Tokyo Tower Visit"
+                  placeholder={t('itinerary.name_placeholder')}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
@@ -770,32 +776,32 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
                   />
                 </div>
                 <div className="field">
-                  <label className="label">Category</label>
+                  <label className="label">{t('itinerary.category')}</label>
                   <select
                     className="input"
                     value={costCategory}
                     onChange={(e) => setCostCategory(e.target.value)}
                   >
-                    <option value="food">Food</option>
-                    <option value="transport">Transport</option>
-                    <option value="hotel">Accommodation</option>
-                    <option value="activity">Tickets</option>
-                    <option value="shopping">Shopping</option>
-                    <option value="emergency">Emergency</option>
-                    <option value="other">Other</option>
+                    <option value="food">{t('budget.categories.food')}</option>
+                    <option value="transport">{t('budget.categories.transport')}</option>
+                    <option value="hotel">{t('budget.categories.hotel')}</option>
+                    <option value="activity">{t('budget.categories.activity')}</option>
+                    <option value="shopping">{t('budget.categories.shopping')}</option>
+                    <option value="emergency">{t('budget.categories.emergency')}</option>
+                    <option value="other">{t('budget.categories.other')}</option>
                   </select>
                 </div>
               </div>
 
               <div className="field">
                 <label className="label">
-                  Location
-                  {searching && <span className={styles.searchingHint}>Searching…</span>}
+                  {t('itinerary.location')}
+                  {searching && <span className={styles.searchingHint}>{t('itinerary.searching')}</span>}
                 </label>
                 <input
                   type="text"
                   className="input"
-                  placeholder="Search an address or place"
+                  placeholder={t('itinerary.location_placeholder')}
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   onFocus={() => {
@@ -829,11 +835,11 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
               {/* Pin on Map selection section */}
               <div className="field">
                 <label className="label">
-                  Pin on map
+                  {t('itinerary.pin_on_map')}
                   {selectedLat ? (
                     <span className="tabular">{selectedLat.toFixed(4)}, {selectedLng?.toFixed(4)}</span>
                   ) : (
-                    <span>Tap the map to choose</span>
+                    <span>{t('itinerary.tap_map')}</span>
                   )}
                 </label>
                 <div id="select-map-container" className={styles.selectMap} />
@@ -844,7 +850,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
                     rel="noopener noreferrer"
                     className={styles.checkLink}
                   >
-                    Check on Google Maps
+                    {t('itinerary.check_google')}
                     <Icon name="arrowUpRight" size={12} />
                   </a>
                 )}
@@ -854,7 +860,7 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
                 <label className="label">{t('itinerary.notes')}</label>
                 <textarea
                   className="input"
-                  placeholder="Booking codes, phone numbers, reminders"
+                  placeholder={t('itinerary.notes_placeholder')}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                 />
@@ -873,6 +879,19 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
             </form>
           </div>
         </div>
+      )}
+
+      {checkinActivity && (
+        <CheckInSheet
+          activity={checkinActivity}
+          currency={currency}
+          onClose={() => setCheckinActivity(null)}
+          onSaved={() => {
+            setCheckinActivity(null);
+            showSuccess(t('checkin.done', { name: checkinActivity.name }));
+            onRefresh();
+          }}
+        />
       )}
 
       <AttachmentsModal

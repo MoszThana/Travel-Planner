@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { and, eq } from 'drizzle-orm';
 import { requireUser, errorResponse } from '@/lib/access';
+import { logEvent } from '@/lib/events';
 
 export const runtime = 'edge';
 
@@ -75,6 +76,7 @@ export async function POST(
         role: invite.role,
         joinedAt: Date.now(),
       });
+      await logEvent(db, invite.tripId, userId, 'member.joined', invite.role === 'editor' ? 'can edit' : 'view only');
     } else if ((ROLE_RANK[existing[0].role] ?? 0) < (ROLE_RANK[invite.role] ?? 0)) {
       // Already a member: an invite can raise the role but never lower it
       await db.update(schema.tripMembers).set({ role: invite.role }).where(eq(schema.tripMembers.id, existing[0].id));

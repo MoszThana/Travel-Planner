@@ -14,13 +14,13 @@ export async function POST(request: Request) {
     const { userId, pin } = body;
 
     if (!userId || !isValidPin(typeof pin === 'string' ? pin.trim() : pin)) {
-      return NextResponse.json({ error: 'Choose a profile and enter your 4-digit PIN.' }, { status: 400 });
+      return NextResponse.json({ error: 'Choose a profile and enter your 4-digit PIN.', code: 'need_profile_and_pin' }, { status: 400 });
     }
     const enteredPin = pin.trim();
 
     const userRows = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
     if (userRows.length === 0) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Profile not found', code: 'not_found' }, { status: 404 });
     }
     const user = userRows[0];
     const now = Date.now();
@@ -28,13 +28,13 @@ export async function POST(request: Request) {
     if (user.lockedUntil && user.lockedUntil > now) {
       const minutes = Math.ceil((user.lockedUntil - now) / 60000);
       return NextResponse.json(
-        { error: `Too many wrong PINs. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.` },
+        { error: `Too many wrong PINs. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`, code: 'locked', minutes },
         { status: 429 }
       );
     }
 
     if (!user.pin) {
-      return NextResponse.json({ error: 'This profile has no PIN set and cannot be used to log in.' }, { status: 403 });
+      return NextResponse.json({ error: 'This profile has no PIN set and cannot be used to log in.', code: 'no_pin' }, { status: 403 });
     }
 
     const { ok, needsUpgrade } = await verifyPin(enteredPin, user.pin);
@@ -52,7 +52,10 @@ export async function POST(request: Request) {
         {
           error: locked
             ? `Too many wrong PINs. This profile is locked for ${LOCK_MINUTES} minutes.`
-            : `Incorrect PIN. ${MAX_FAILED_ATTEMPTS - attempts} ${MAX_FAILED_ATTEMPTS - attempts === 1 ? 'try' : 'tries'} left.`
+            : `Incorrect PIN. ${MAX_FAILED_ATTEMPTS - attempts} ${MAX_FAILED_ATTEMPTS - attempts === 1 ? 'try' : 'tries'} left.`,
+          code: locked ? 'locked' : 'pin_wrong',
+          minutes: LOCK_MINUTES,
+          left: MAX_FAILED_ATTEMPTS - attempts
         },
         { status: locked ? 429 : 401 }
       );

@@ -25,6 +25,9 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const saved = localStorage.getItem('locale') as Locale;
       if (saved === 'en' || saved === 'th') {
         setLocaleState(saved);
+      } else if (navigator.language?.toLowerCase().startsWith('th')) {
+        // First visit on a Thai phone/browser: start in Thai
+        setLocaleState('th');
       }
     }
   }, []);
@@ -36,32 +39,33 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
-  const t = (keyPath: string, replacements?: Record<string, string | number>): string => {
-    const dict = translations[locale];
-    const keys = keyPath.split('.');
+  const lookup = (dict: any, keyPath: string): string | null => {
     let value: any = dict;
-
-    for (const key of keys) {
+    for (const key of keyPath.split('.')) {
       if (value && typeof value === 'object' && key in value) {
-        value = value[key as keyof typeof value];
+        value = value[key];
       } else {
-        return keyPath; // fallback to key path if translation missing
+        return null;
       }
     }
+    return typeof value === 'string' ? value : null;
+  };
 
-    if (typeof value !== 'string') {
-      return keyPath;
-    }
-
-    let result = value;
+  const t = (keyPath: string, replacements?: Record<string, string | number>): string => {
+    // Missing Thai text falls back to English, never to the raw key
+    let result = lookup(translations[locale], keyPath) ?? lookup(translations.en, keyPath) ?? keyPath;
     if (replacements) {
       Object.entries(replacements).forEach(([k, v]) => {
-        result = result.replace(`{${k}}`, String(v));
+        result = result.split(`{${k}}`).join(String(v));
       });
     }
-
     return result;
   };
+
+  // Screen readers and fonts follow the chosen language
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   return (
     <TranslationContext.Provider value={{ locale, setLocale, t }}>

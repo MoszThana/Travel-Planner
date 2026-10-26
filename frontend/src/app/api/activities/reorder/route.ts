@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
-import { requireUser, requireTripRole, tripIdForActivity, tripIdForDay, errorResponse } from '@/lib/access';
+import { requireUser, requireTripRole, tripIdForActivity, tripIdForDay, dayLabel, errorResponse } from '@/lib/access';
+import { logEvent } from '@/lib/events';
 
 export const runtime = 'edge';
 
@@ -38,6 +39,7 @@ export async function PUT(request: Request) {
     );
     // batch() is typed as a non-empty tuple; the length check above guarantees that
     await db.batch(updates as [typeof updates[number], ...typeof updates]);
+    await logEvent(db, tripId!, userId, 'activity.reordered', await dayLabel(db, items[0].dayId));
 
     return NextResponse.json({ success: true });
   } catch (err) {

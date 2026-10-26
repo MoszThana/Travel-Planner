@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { apiRequest } from '@/utils/api';
 import { useAuth } from '@/context/AuthContext';
 import styles from './AttachmentsModal.module.css';
+import { useTranslation } from '@/context/TranslationContext';
 import { Icon, IconName } from './Icon';
 
 interface Attachment {
@@ -23,6 +24,7 @@ interface AttachmentsModalProps {
 
 export const AttachmentsModal: React.FC<AttachmentsModalProps> = ({ tripId, isOpen, onClose }) => {
   const { user } = useAuth();
+  const { t, locale } = useTranslation();
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -37,10 +39,12 @@ export const AttachmentsModal: React.FC<AttachmentsModalProps> = ({ tripId, isOp
       setAttachments(data);
     } catch (err: any) {
       console.error('Error fetching attachments:', err);
-      setErrorMsg(err.message || 'Failed to load files.');
+      setErrorMsg(err.message || t('files.load_failed'));
     } finally {
       setLoading(false);
     }
+    // t() is recreated each render; only reload when the trip changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripId]);
 
   useEffect(() => {
@@ -79,14 +83,14 @@ export const AttachmentsModal: React.FC<AttachmentsModalProps> = ({ tripId, isOp
 
       const data = await res.json() as any;
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to upload file.');
+        throw new Error(data.error || t('files.upload_failed'));
       }
 
       setSelectedFile(null);
       loadAttachments();
     } catch (err: any) {
       console.error('Upload error:', err);
-      setErrorMsg(err.message || 'Failed to upload file.');
+      setErrorMsg(err.message || t('files.upload_failed'));
     } finally {
       setUploading(false);
     }
@@ -114,8 +118,8 @@ export const AttachmentsModal: React.FC<AttachmentsModalProps> = ({ tripId, isOp
     <div className="sheet-overlay" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
-          <h2 className="sheet-title">Files</h2>
-          <button className="btn-icon" onClick={onClose} aria-label="Close">
+          <h2 className="sheet-title">{t('files.title')}</h2>
+          <button className="btn-icon" onClick={onClose} aria-label={t('common.close')}>
             <Icon name="x" size={18} />
           </button>
         </div>
@@ -129,7 +133,7 @@ export const AttachmentsModal: React.FC<AttachmentsModalProps> = ({ tripId, isOp
             <div className={styles.uploadBox}>
               <Icon name="upload" size={22} className={styles.uploadIcon} />
               <span className={styles.uploadText}>
-                {selectedFile ? selectedFile.name : 'Choose a ticket, receipt, PDF or photo'}
+                {selectedFile ? selectedFile.name : t('files.choose')}
               </span>
               {selectedFile && <span className={styles.fileSize}>{formatBytes(selectedFile.size)}</span>}
             </div>
@@ -137,20 +141,20 @@ export const AttachmentsModal: React.FC<AttachmentsModalProps> = ({ tripId, isOp
 
           {selectedFile && (
             <button className="btn btn-primary btn-block" onClick={handleUpload} disabled={uploading}>
-              {uploading ? 'Uploading…' : 'Upload'}
+              {uploading ? t('files.uploading') : t('files.upload')}
             </button>
           )}
         </div>
 
         {/* Files List */}
         <section className="section">
-          <span className="eyebrow">Uploaded</span>
+          <span className="eyebrow">{t('files.uploaded')}</span>
           {loading ? (
-            <div className="empty">{'Loading files…'}</div>
+            <div className="empty">{t('files.loading')}</div>
           ) : attachments.length === 0 ? (
             <div className="empty">
               <Icon name="paperclip" size={24} />
-              No tickets or receipts yet.
+              {t('files.empty')}
             </div>
           ) : (
             <div className="list">
@@ -168,7 +172,7 @@ export const AttachmentsModal: React.FC<AttachmentsModalProps> = ({ tripId, isOp
                   <span className={styles.fileDetails}>
                     <span className={styles.fileName}>{file.name}</span>
                     <span className={styles.fileMeta}>
-                      {formatBytes(file.fileSize)} · {new Date(file.createdAt).toLocaleDateString()}
+                      {formatBytes(file.fileSize)} · {new Date(file.createdAt).toLocaleDateString(locale === 'th' ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </span>
                   </span>
                   <Icon name="arrowUpRight" size={16} className={styles.viewIcon} />

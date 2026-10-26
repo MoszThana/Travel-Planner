@@ -5,6 +5,7 @@ import { useTranslation } from '@/context/TranslationContext';
 import { apiRequest, showError } from '@/utils/api';
 import { useAiEnabled } from '@/utils/useAiEnabled';
 import { Icon, IconName } from './Icon';
+import { confirmDialog } from './Feedback';
 import localStyles from './AIDrawer.module.css';
 
 interface AIDrawerProps {
@@ -30,20 +31,21 @@ type WeatherResult =
 
 // WMO weather codes used by Open-Meteo
 function describeWeather(code: number): { label: string; icon: IconName; wet: boolean } {
-  if (code === 0) return { label: 'Clear', icon: 'sun', wet: false };
-  if (code <= 3) return { label: code === 1 ? 'Mostly clear' : code === 2 ? 'Partly cloudy' : 'Cloudy', icon: 'cloud', wet: false };
-  if (code === 45 || code === 48) return { label: 'Fog', icon: 'cloud', wet: false };
-  if (code >= 51 && code <= 57) return { label: 'Drizzle', icon: 'rain', wet: true };
-  if (code >= 61 && code <= 67) return { label: 'Rain', icon: 'rain', wet: true };
-  if (code >= 71 && code <= 77) return { label: 'Snow', icon: 'snow', wet: true };
-  if (code >= 80 && code <= 82) return { label: 'Showers', icon: 'rain', wet: true };
-  if (code >= 85 && code <= 86) return { label: 'Snow showers', icon: 'snow', wet: true };
-  if (code >= 95) return { label: 'Thunderstorm', icon: 'rain', wet: true };
-  return { label: 'Mixed', icon: 'cloud', wet: false };
+  // label = key under weather.* in the locale files
+  if (code === 0) return { label: 'clear', icon: 'sun', wet: false };
+  if (code <= 3) return { label: code === 1 ? 'mostly_clear' : code === 2 ? 'partly_cloudy' : 'cloudy', icon: 'cloud', wet: false };
+  if (code === 45 || code === 48) return { label: 'fog', icon: 'cloud', wet: false };
+  if (code >= 51 && code <= 57) return { label: 'drizzle', icon: 'rain', wet: true };
+  if (code >= 61 && code <= 67) return { label: 'rain', icon: 'rain', wet: true };
+  if (code >= 71 && code <= 77) return { label: 'snow', icon: 'snow', wet: true };
+  if (code >= 80 && code <= 82) return { label: 'showers', icon: 'rain', wet: true };
+  if (code >= 85 && code <= 86) return { label: 'snow_showers', icon: 'snow', wet: true };
+  if (code >= 95) return { label: 'thunderstorm', icon: 'rain', wet: true };
+  return { label: 'mixed', icon: 'cloud', wet: false };
 }
 
 export const AIDrawer: React.FC<AIDrawerProps> = ({ trip, onRefresh, userRole = 'editor' }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const aiEnabled = useAiEnabled();
   const canEdit = userRole === 'owner' || userRole === 'editor';
 
@@ -85,7 +87,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ trip, onRefresh, userRole = 
       });
       setSuggestions(res.map((s: any, idx: number) => ({ id: `sug-${idx}-${Date.now()}`, ...s })));
     } catch (err) {
-      showError(err, "Couldn't get ideas right now.");
+      showError(err, t('info.ideas_failed'));
     } finally {
       setLoadingSuggestions(false);
     }
@@ -114,7 +116,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ trip, onRefresh, userRole = 
       setSuggestions(prev => prev.filter(s => s.id !== sug.id));
       onRefresh();
     } catch (err) {
-      showError(err, "Couldn't add it to the plan.");
+      showError(err, t('info.add_failed'));
     }
   };
 
@@ -135,24 +137,24 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ trip, onRefresh, userRole = 
       setShowEmgForm(false);
       onRefresh();
     } catch (err) {
-      showError(err, "Couldn't save the contact.");
+      showError(err, t('info.save_contact_failed'));
     } finally {
       setSavingEmg(false);
     }
   };
 
   const handleDeleteEmergency = async (id: string) => {
-    if (!window.confirm('Remove this contact?')) return;
+    if (!(await confirmDialog({ message: t('info.remove_contact_confirm'), confirmLabel: t('common.remove'), cancelLabel: t('common.cancel'), danger: true }))) return;
     try {
       await apiRequest(`/emergency/${id}`, { method: 'DELETE' });
       onRefresh();
     } catch (err) {
-      showError(err, "Couldn't remove the contact.");
+      showError(err, t('info.remove_contact_failed'));
     }
   };
 
   const formatDay = (iso: string) =>
-    new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+    new Date(`${iso}T00:00:00`).toLocaleDateString(locale === 'th' ? 'th-TH' : 'en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 
   const wetDays = weather?.status === 'ok'
     ? weather.forecast.filter((d) => describeWeather(d.code).wet || (d.rainChance ?? 0) >= 60)
@@ -169,43 +171,43 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ trip, onRefresh, userRole = 
       {/* Weather */}
       <section className="section">
         <span className="eyebrow">
-          Weather{weather && 'place' in weather ? ` · ${weather.place}` : ''}
+          {t('info.weather')}{weather && 'place' in weather ? ` · ${weather.place}` : ''}
         </span>
         <div className="card lift">
           {weatherError ? (
             <p style={{ fontSize: '14px' }}>{weatherError}</p>
           ) : !weather ? (
-            <p style={{ fontSize: '14px' }}>Loading forecast…</p>
+            <p style={{ fontSize: '14px' }}>{t('info.loading_forecast')}</p>
           ) : weather.status === 'too-early' ? (
             <div className={localStyles.alertOk}>
               <Icon name="calendar" size={16} />
-              Forecasts reach 16 days ahead. Check back from {formatDay(weather.availableFrom)}.
+              {t('info.too_early', { date: formatDay(weather.availableFrom) })}
             </div>
           ) : weather.status === 'past' ? (
-            <p style={{ fontSize: '14px' }}>This trip has ended.</p>
+            <p style={{ fontSize: '14px' }}>{t('info.trip_ended')}</p>
           ) : weather.status === 'no-location' ? (
             <p style={{ fontSize: '14px' }}>
-              Couldn&apos;t find &ldquo;{weather.destination}&rdquo; on the map. Pin an activity on the map to get the forecast.
+              {t('info.no_location', { destination: weather.destination })}
             </p>
           ) : (
             <>
               <div className={wetDays.length > 0 ? localStyles.alertWarn : localStyles.alertOk}>
                 <Icon name={wetDays.length > 0 ? 'rain' : 'sun'} size={16} />
                 {wetDays.length > 0
-                  ? `Rain likely on ${wetDays.map((d) => t('itinerary.day', { number: d.dayNumber })).join(', ')} — plan indoor options.`
-                  : 'No rain expected on the forecast days.'}
+                  ? t('info.rain_days', { days: wetDays.map((d) => t('itinerary.day', { number: d.dayNumber })).join(', ') })
+                  : t('info.no_rain')}
               </div>
               <div className={localStyles.weatherGrid}>
                 {weather.forecast.map((d) => {
                   const w = describeWeather(d.code);
                   return (
-                    <div key={d.date} className={localStyles.weatherDay} title={w.label}>
+                    <div key={d.date} className={localStyles.weatherDay} title={t(`weather.${w.label}`)}>
                       <span className={localStyles.weatherLabel}>{t('itinerary.day', { number: d.dayNumber })}</span>
                       <span className={localStyles.weatherDate}>{formatDay(d.date)}</span>
                       <Icon name={w.icon} size={20} className={localStyles.weatherIcon} />
                       <span className={localStyles.weatherTemp}>{Math.round(d.max)}°</span>
                       <span className={localStyles.weatherLow}>{Math.round(d.min)}°</span>
-                      {d.rainChance !== null && <span className={localStyles.weatherRain}>{d.rainChance}% rain</span>}
+                      {d.rainChance !== null && <span className={localStyles.weatherRain}>{t('info.rain_chance', { percent: d.rainChance })}</span>}
                     </div>
                   );
                 })}
@@ -218,19 +220,19 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ trip, onRefresh, userRole = 
       {/* AI ideas — only shown when Gemini is set up */}
       {aiEnabled && (
         <section className="section">
-          <span className="eyebrow">Ask for ideas</span>
+          <span className="eyebrow">{t('info.ask_ideas')}</span>
           <div className="card">
             <form onSubmit={getAISuggestions} className={localStyles.askRow}>
               <input
                 type="text"
                 className="input"
-                placeholder="Parks, cafés, night markets…"
+                placeholder={t('info.ideas_placeholder')}
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}
               />
               <button type="submit" disabled={loadingSuggestions} className="btn btn-primary">
                 <Icon name="sparkles" size={15} />
-                {loadingSuggestions ? t('common.loading') : 'Ask'}
+                {loadingSuggestions ? t('common.loading') : t('info.ask')}
               </button>
             </form>
 
@@ -247,7 +249,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ trip, onRefresh, userRole = 
                         <span />
                         <button className="btn btn-sm" onClick={() => addSuggestionToItinerary(sug)}>
                           <Icon name="plus" size={14} />
-                          Add to Day 1
+                          {t('info.add_to_day1')}
                         </button>
                       </div>
                     )}
@@ -268,7 +270,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ trip, onRefresh, userRole = 
           {canEdit && (
             <button className="btn btn-sm" onClick={() => setShowEmgForm(true)}>
               <Icon name="plus" size={14} />
-              Contact
+              {t('info.contact')}
             </button>
           )}
         </div>
@@ -284,7 +286,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ trip, onRefresh, userRole = 
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <a href={`tel:${emg.phone.replace(/[^\d+]/g, '')}`} className={localStyles.emgPhone}>{emg.phone}</a>
                 {canEdit && (
-                  <button className="btn-icon danger" onClick={() => handleDeleteEmergency(emg.id)} aria-label="Remove contact">
+                  <button className="btn-icon danger" onClick={() => handleDeleteEmergency(emg.id)} aria-label={t('info.remove_contact')}>
                     <Icon name="trash" size={15} />
                   </button>
                 )}
@@ -294,7 +296,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ trip, onRefresh, userRole = 
           {(!trip.emergency || trip.emergency.length === 0) && (
             <div className="list-row">
               <span className="list-sub">
-                Add your hotel, your country&apos;s embassy and local emergency numbers so everyone has them.
+                {t('info.contacts_empty')}
               </span>
             </div>
           )}
@@ -315,12 +317,12 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ trip, onRefresh, userRole = 
             </div>
             <form onSubmit={handleAddEmergencySubmit} className="form">
               <div className="field">
-                <label className="label">Name or service</label>
+                <label className="label">{t('info.contact_name')}</label>
                 <input
                   type="text"
                   required
                   className="input"
-                  placeholder="e.g. Hotel front desk, Thai Embassy Tokyo"
+                  placeholder={t('info.contact_name_placeholder')}
                   value={emgName}
                   onChange={(e) => setEmgName(e.target.value)}
                 />
@@ -328,18 +330,18 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ trip, onRefresh, userRole = 
 
               <div className="field-row">
                 <div className="field">
-                  <label className="label">Relation</label>
+                  <label className="label">{t('info.relation')}</label>
                   <input
                     type="text"
                     required
                     className="input"
-                    placeholder="Lodging, embassy, police…"
+                    placeholder={t('info.relation_placeholder')}
                     value={emgRelation}
                     onChange={(e) => setEmgRelation(e.target.value)}
                   />
                 </div>
                 <div className="field">
-                  <label className="label">Phone</label>
+                  <label className="label">{t('info.phone')}</label>
                   <input
                     type="tel"
                     required
@@ -352,10 +354,10 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ trip, onRefresh, userRole = 
               </div>
 
               <div className="field">
-                <label className="label">Address or medical notes</label>
+                <label className="label">{t('info.contact_note')}</label>
                 <textarea
                   className="input"
-                  placeholder="Address, allergies, medications, blood type"
+                  placeholder={t('info.contact_note_placeholder')}
                   value={emgNote}
                   onChange={(e) => setEmgNote(e.target.value)}
                 />

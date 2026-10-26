@@ -10,12 +10,31 @@ export interface UserProfile {
   avatarUrl?: string;
 }
 
+// Profile used last on this device (shown first on the login screen)
+export const LAST_PROFILE_KEY = 'last_profile_id';
+const rememberProfile = (userId: string) => {
+  try {
+    localStorage.setItem(LAST_PROFILE_KEY, userId);
+  } catch {
+    // Storage unavailable: nothing to remember
+  }
+};
+
+// code + data let the login screen show a translated message (e.g. 'pin_wrong', { left: 3 })
+export interface AuthResult {
+  success: boolean;
+  error?: string;
+  code?: string;
+  data?: Record<string, unknown>;
+}
+
 interface AuthContextType {
   user: UserProfile | null;
   authLoading: boolean;
   allUsers: UserProfile[];
-  loginWithPin: (userId: string, pin: string) => Promise<{ success: boolean; error?: string }>;
-  createProfile: (name: string, email: string, pin: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithPin: (userId: string, pin: string) => Promise<AuthResult>;
+  createProfile: (name: string, email: string, pin: string) => Promise<AuthResult>;
+  resetPin: (userId: string, code: string, newPin: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
   refreshProfiles: () => Promise<void>;
 }
@@ -74,12 +93,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (res && res.success && res.user) {
         setUser(res.user);
+        rememberProfile(res.user.id);
         refreshProfiles();
         return { success: true };
       }
       return { success: false, error: res?.error || 'Authentication failed' };
     } catch (err: any) {
-      return { success: false, error: err.message || 'Incorrect PIN or server error' };
+      return { success: false, error: err.message || 'Incorrect PIN or server error', code: err.code, data: err.data };
     }
   };
 
@@ -92,12 +112,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (res && res.success && res.user) {
         setUser(res.user);
+        rememberProfile(res.user.id);
         await refreshProfiles();
         return { success: true };
       }
       return { success: false, error: res?.error || 'Failed to create profile' };
     } catch (err: any) {
-      return { success: false, error: err.message || 'Profile creation failed' };
+      return { success: false, error: err.message || 'Profile creation failed', code: err.code, data: err.data };
+    }
+  };
+
+  // Choose a new PIN with a one-time reset code from a trip owner (also logs in)
+  const resetPin = async (userId: string, code: string, newPin: string) => {
+    try {
+      const res = await apiRequest('/users/reset-pin', {
+        method: 'POST',
+        body: JSON.stringify({ userId, code, newPin })
+      }) as any;
+      if (res && res.success && res.user) {
+        setUser(res.user);
+        rememberProfile(res.user.id);
+        refreshProfiles();
+        return { success: true };
+      }
+      return { success: false, error: res?.error || 'Could not reset the PIN' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Could not reset the PIN', code: err.code, data: err.data };
     }
   };
 
@@ -112,7 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, authLoading, allUsers, loginWithPin, createProfile, logout, refreshProfiles }}>
+    <AuthContext.Provider value={{ user, authLoading, allUsers, loginWithPin, createProfile, resetPin, logout, refreshProfiles }}>
       {children}
     </AuthContext.Provider>
   );

@@ -9,6 +9,8 @@ export const users = sqliteTable('users', {
   pin: text('pin'), // PBKDF2 hash of the 4-digit PIN (legacy rows: plain PIN, upgraded on next login)
   failedAttempts: integer('failed_attempts').notNull().default(0),
   lockedUntil: integer('locked_until'), // ms timestamp; login refused until then
+  resetCodeHash: text('reset_code_hash'), // one-time PIN reset code (hashed), created by a trip owner
+  resetExpires: integer('reset_expires'), // ms timestamp
   createdAt: integer('created_at').notNull(),
 });
 
@@ -58,6 +60,9 @@ export const activities = sqliteTable('activities', {
   costCategory: text('cost_category'), // 'food' | 'transport' | 'hotel' | 'activity' | 'shopping' | 'emergency' | 'other'
   order: integer('order').notNull(), // for drag & drop sorting
   visited: integer('visited').default(0), // 0 = false, 1 = true
+  createdBy: text('created_by'), // user id (nullable for older rows)
+  updatedBy: text('updated_by'),
+  updatedAt: integer('updated_at'),
 });
 
 // 6. Group Expenses Table (payments made by individuals on the trip)
@@ -133,4 +138,14 @@ export const tripInvites = sqliteTable('trip_invites', {
   createdAt: integer('created_at').notNull(),
   expiresAt: integer('expires_at').notNull(),
   revokedAt: integer('revoked_at'),
+});
+
+// 13. Trip Events ("What's new" log: who changed what, and when)
+export const tripEvents = sqliteTable('trip_events', {
+  id: text('id').primaryKey(),
+  tripId: text('trip_id').notNull().references(() => trips.id),
+  userId: text('user_id').notNull(),
+  type: text('type').notNull(), // e.g. 'activity.added', 'expense.deleted', 'member.joined'
+  summary: text('summary').notNull(), // short human text, e.g. 'Osaka Castle · Day 2'
+  createdAt: integer('created_at').notNull(),
 });

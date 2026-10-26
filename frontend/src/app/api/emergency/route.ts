@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { requireUser, requireTripRole, errorResponse } from '@/lib/access';
+import { logEvent } from '@/lib/events';
 
 export const runtime = 'edge';
 
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
       note: note || ''
     });
 
+    await logEvent(db, tripId, userId, 'contact.added', name);
     return NextResponse.json({ success: true, id });
   } catch (err) {
     return errorResponse(err, 'Error adding emergency contact:');

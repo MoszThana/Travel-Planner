@@ -3,6 +3,7 @@ import { Inter, Outfit, Noto_Sans_Thai } from "next/font/google";
 import "./globals.css";
 import { TranslationProvider } from "@/context/TranslationContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { FeedbackHost } from "@/components/Feedback";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const notoThai = Noto_Sans_Thai({ subsets: ["thai"], weight: ["400", "500", "600", "700"], variable: "--font-thai" });
@@ -38,6 +39,7 @@ export default function RootLayout({
             <div className="app-container">
               {children}
             </div>
+            <FeedbackHost />
           </AuthProvider>
         </TranslationProvider>
       </body>

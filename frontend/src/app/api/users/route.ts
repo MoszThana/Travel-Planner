@@ -40,15 +40,15 @@ export async function POST(request: Request) {
     const pin = typeof body.pin === 'string' ? body.pin.trim() : '';
 
     if (!name || !email) {
-      return NextResponse.json({ error: 'Please enter your name and email.' }, { status: 400 });
+      return NextResponse.json({ error: 'Please enter your name and email.', code: 'need_all_fields' }, { status: 400 });
     }
     if (!isValidPin(pin)) {
-      return NextResponse.json({ error: 'PIN must be exactly 4 digits' }, { status: 400 });
+      return NextResponse.json({ error: 'PIN must be exactly 4 digits', code: 'need_new_pin' }, { status: 400 });
     }
 
     const existing = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.email, email)).limit(1);
     if (existing.length > 0) {
-      return NextResponse.json({ error: 'Email already registered' }, { status: 400 });
+      return NextResponse.json({ error: 'Email already registered', code: 'email_taken' }, { status: 400 });
     }
 
     const userId = crypto.randomUUID();

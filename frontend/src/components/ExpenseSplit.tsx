@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { apiRequest, showError } from '@/utils/api';
 import { formatMoney } from '@/utils/money';
 import { Icon } from './Icon';
+import { confirmDialog } from './Feedback';
 import localStyles from './ExpenseSplit.module.css';
 
 interface ExpenseSplitProps {
@@ -101,7 +102,7 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
 
     const totalAmount = parseFloat(amount);
     if (!(totalAmount > 0)) {
-      setFormError('Enter an amount greater than 0.');
+      setFormError(t('group.need_amount'));
       return;
     }
     const selectedMembers = Object.entries(sharesCheck)
@@ -110,7 +111,7 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
       .filter((mid) => members.some((m: any) => m.id === mid));
 
     if (selectedMembers.length === 0) {
-      setFormError('Select at least one person to share the cost.');
+      setFormError(t('group.need_people'));
       return;
     }
 
@@ -128,7 +129,7 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
       splitPayload = selectedMembers.map(userId => ({ userId, amount: parseFloat(customSplits[userId]) || 0 }));
       const customSum = splitPayload.reduce((sum, s) => sum + s.amount, 0);
       if (Math.abs(customSum - totalAmount) > 0.01) {
-        setFormError(`The custom amounts add up to ${money(customSum)}, but the total is ${money(totalAmount)}.`);
+        setFormError(t('group.custom_mismatch', { sum: money(customSum), total: money(totalAmount) }));
         return;
       }
     }
@@ -150,23 +151,23 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
       resetForm();
       onRefresh();
     } catch (err: any) {
-      setFormError(err?.message || "Couldn't save the expense.");
+      setFormError(err?.message || t('group.save_failed'));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDeleteExpense = async (exp: any) => {
-    if (!window.confirm(`Delete "${exp.description}" (${money(exp.amount)})?`)) return;
+    if (!(await confirmDialog({ title: t('group.delete_title'), message: `"${exp.description}" · ${money(exp.amount)}`, confirmLabel: t('common.delete'), cancelLabel: t('common.cancel'), danger: true }))) return;
     try {
       await apiRequest(`/expenses/${exp.id}`, { method: 'DELETE' });
       onRefresh();
     } catch (err) {
-      showError(err, "Couldn't delete the expense.");
+      showError(err, t('group.delete_failed'));
     }
   };
 
-  const getUserName = (id: string) => members.find((m: any) => m.id === id)?.name || 'Former member';
+  const getUserName = (id: string) => members.find((m: any) => m.id === id)?.name || t('group.former_member');
   const getUserAvatar = (id: string) =>
     members.find((m: any) => m.id === id)?.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg';
 
@@ -177,7 +178,7 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
         {canEdit && (
           <button className="btn btn-primary btn-sm" onClick={() => setShowAddForm(true)}>
             <Icon name="plus" size={16} />
-            Expense
+            {t('group.add_expense')}
           </button>
         )}
       </div>
@@ -208,7 +209,7 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
         {settlements.length === 0 ? (
           <div className={`card ${localStyles.settled}`}>
             <Icon name="check" size={18} />
-            {expenses.length === 0 ? 'No shared expenses yet.' : t('group.no_debts')}
+            {expenses.length === 0 ? t('group.empty') : t('group.no_debts')}
           </div>
         ) : (
           <div className="list">
@@ -235,13 +236,13 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
       {/* Recorded expenses */}
       <section className="section">
         <div className="section-head">
-          <span className="eyebrow">Expenses · {expenses.length}</span>
-          {expenses.length > 0 && <span className="muted tabular" style={{ fontSize: '13px' }}>Total {money(totalSpent)}</span>}
+          <span className="eyebrow">{t('group.expenses', { count: expenses.length })}</span>
+          {expenses.length > 0 && <span className="muted tabular" style={{ fontSize: '13px' }}>{t('group.total', { amount: money(totalSpent) })}</span>}
         </div>
         {expenses.length === 0 ? (
           <div className="empty">
             <Icon name="wallet" size={26} />
-            {canEdit ? 'Record who paid for meals, rides and tickets — the app works out who owes whom.' : 'No shared expenses yet.'}
+            {canEdit ? t('group.empty_editor') : t('group.empty')}
           </div>
         ) : (
           <div className="list">
@@ -252,13 +253,13 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
                   <div className={localStyles.expenseText}>
                     <span className="list-title">{exp.description}</span>
                     <span className="list-sub">
-                      {getUserName(exp.payerId)} paid · split {sharedBy} way{sharedBy === 1 ? '' : 's'} · {new Date(exp.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                      {t('group.paid_split', { name: getUserName(exp.payerId), count: sharedBy, date: new Date(exp.createdAt).toLocaleDateString(locale === 'th' ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short' }) })}
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span className={localStyles.debtAmount}>{money(exp.amount)}</span>
                     {canEdit && (
-                      <button className="btn-icon danger" onClick={() => handleDeleteExpense(exp)} aria-label="Delete expense">
+                      <button className="btn-icon danger" onClick={() => handleDeleteExpense(exp)} aria-label={t('group.delete_expense')}>
                         <Icon name="trash" size={15} />
                       </button>
                     )}
@@ -277,19 +278,19 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
         <div className="sheet-overlay" onClick={resetForm}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <div className="sheet-head">
-              <h2 className="sheet-title">Shared expense</h2>
+              <h2 className="sheet-title">{t('group.new_title')}</h2>
               <button type="button" className="btn-icon" onClick={resetForm} aria-label={t('common.cancel')}>
                 <Icon name="x" size={18} />
               </button>
             </div>
             <form onSubmit={handleAddExpenseSubmit} className="form">
               <div className="field">
-                <label className="label">Description</label>
+                <label className="label">{t('group.description')}</label>
                 <input
                   type="text"
                   required
                   className="input"
-                  placeholder="e.g., Dinner at Dotonbori"
+                  placeholder={t('group.description_placeholder')}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                 />
@@ -297,7 +298,7 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
 
               <div className="field-row">
                 <div className="field">
-                  <label className="label">Amount ({currency})</label>
+                  <label className="label">{t('group.amount_label', { currency })}</label>
                   <input
                     type="number"
                     inputMode="decimal"
@@ -326,22 +327,22 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
 
               <div className="field-row">
                 <div className="field">
-                  <label className="label">Category</label>
+                  <label className="label">{t('group.category')}</label>
                   <select
                     className="input"
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
                   >
-                    <option value="food">Food</option>
-                    <option value="transport">Transport</option>
-                    <option value="hotel">Accommodation</option>
-                    <option value="activity">Tickets</option>
-                    <option value="shopping">Shopping</option>
-                    <option value="other">Other</option>
+                    <option value="food">{t('budget.categories.food')}</option>
+                    <option value="transport">{t('budget.categories.transport')}</option>
+                    <option value="hotel">{t('budget.categories.hotel')}</option>
+                    <option value="activity">{t('budget.categories.activity')}</option>
+                    <option value="shopping">{t('budget.categories.shopping')}</option>
+                    <option value="other">{t('budget.categories.other')}</option>
                   </select>
                 </div>
                 <div className="field">
-                  <label className="label">Split</label>
+                  <label className="label">{t('group.split')}</label>
                   <select
                     className="input"
                     value={splitType}
@@ -365,7 +366,7 @@ export const ExpenseSplit: React.FC<ExpenseSplitProps> = ({ trip, onRefresh, use
                       setSharesCheck(members.reduce((acc: any, m: any) => ({ ...acc, [m.id]: !allOn }), {}));
                     }}
                   >
-                    {members.every((m: any) => sharesCheck[m.id]) ? 'Clear all' : 'Select all'}
+                    {members.every((m: any) => sharesCheck[m.id]) ? t('group.clear_all') : t('group.select_all')}
                   </button>
                 </label>
                 <div className="list">

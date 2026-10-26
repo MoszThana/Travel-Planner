@@ -44,7 +44,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ trips, onTripSelect, onRef
     const endMs = new Date(endDate).getTime();
 
     if (endMs < startMs) {
-      alert(t('common.error') + ': End date cannot be before start date.');
+      showError(null, t('dashboard.end_before_start'));
       setLoading(false);
       return;
     }
@@ -61,7 +61,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ trips, onTripSelect, onRef
         })
       });
     } catch (err) {
-      showError(err, "Couldn't create the trip.");
+      showError(err, t('dashboard.create_failed'));
       setLoading(false);
       return;
     }
@@ -215,7 +215,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ trips, onTripSelect, onRef
           </div>
 
           <div className="field">
-            <label className="label">Currency</label>
+            <label className="label">{t('dashboard.currency')}</label>
             <select className="input" value={currency} onChange={(e) => setCurrency(e.target.value)}>
               {CURRENCIES.map((c) => (
                 <option key={c.code} value={c.code}>{c.code} · {c.label}</option>

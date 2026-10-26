@@ -232,7 +232,7 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
       }
       const place = results[0];
       if (!place) {
-        showError(null, `Couldn't find "${query}" on the map. Try a more specific name.`);
+        showError(null, t('map.not_found', { query }));
         return;
       }
 
@@ -259,7 +259,7 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
       setSearchQuery('');
       onRefresh();
     } catch (err) {
-      showError(err, "Couldn't add the place.");
+      showError(err, t('map.add_failed'));
     } finally {
       setIsSearching(false);
     }
@@ -267,12 +267,12 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
 
   const handleOptimizeClick = () => {
     if (dayActivities.length < 3) {
-      showError(null, 'Add at least 3 stops to this day to look for a shorter order.');
+      showError(null, t('map.need_three'));
       return;
     }
     const unpinned = dayActivities.filter((a: any) => a.lat == null || a.lng == null);
     if (unpinned.length > 0) {
-      showError(null, `${unpinned.length} stop${unpinned.length === 1 ? ' has' : 's have'} no map pin (${unpinned.map((a: any) => a.name).join(', ')}). Pin every stop first.`);
+      showError(null, t('map.unpinned', { count: unpinned.length, names: unpinned.map((a: any) => a.name).join(', ') }));
       return;
     }
 
@@ -299,7 +299,7 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
     const originalKm = routeKm(original);
     const optimizedKm = routeKm(optimized);
     if (optimizedKm >= originalKm - 0.1) {
-      showError(null, `This day's order is already the shortest we can find (${originalKm.toFixed(1)} km in straight lines).`);
+      showError(null, t('map.already_shortest', { km: originalKm.toFixed(1) }));
       return;
     }
 
@@ -322,7 +322,7 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
       setShowComparison(false);
       onRefresh();
     } catch (err) {
-      showError(err, "Couldn't reorder the stops.");
+      showError(err, t('map.reorder_failed'));
     } finally {
       setIsOptimizing(false);
     }
@@ -411,26 +411,25 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
         {!showComparison && validMapActivities.length > 1 && (
           <div className={styles.lineNote}>
             <span className={styles.lineSample} />
-            Straight-line view · tap a stop below for the real route
+            {t('map.line_note')}
           </div>
         )}
 
         {/* Route optimisation comparison */}
         {showComparison && (
           <div className={styles.routeCard}>
-            <span className="eyebrow">Route optimisation</span>
+            <span className="eyebrow">{t('map.optimise_title')}</span>
             <span className={styles.routeText}>
               <span className={styles.routeDot} style={{ background: 'var(--text-faint)' }} />
-              Current order · {routeStats?.originalKm.toFixed(1)} km
+              {t('map.current_order', { km: routeStats ? routeStats.originalKm.toFixed(1) : '' })}
             </span>
             <span className={styles.routeText}>
               <span className={styles.routeDot} style={{ background: 'var(--primary)' }} />
-              Suggested order · {routeStats?.optimizedKm.toFixed(1)} km
-              {routeStats && ` (saves ${(routeStats.originalKm - routeStats.optimizedKm).toFixed(1)} km)`}
+              {t('map.suggested_order', { km: routeStats ? routeStats.optimizedKm.toFixed(1) : '' })}
+              {routeStats && ` ${t('map.saves', { km: (routeStats.originalKm - routeStats.optimizedKm).toFixed(1) })}`}
             </span>
             <p className={styles.routeNote}>
-              Straight-line distances. New order: {optimizedOrder.map((a: any) => a.name).join(' → ')}.
-              Times are not changed — check them after reordering.
+              {t('map.new_order', { order: optimizedOrder.map((a: any) => a.name).join(' → ') })}
             </p>
             <div className="btn-row">
               <button className="btn btn-sm" onClick={() => setShowComparison(false)}>
@@ -451,15 +450,15 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
               <input
                 type="text"
                 className={styles.searchInput}
-                placeholder={isSearching ? 'Searching…' : 'Find a place to add…'}
+                placeholder={isSearching ? t('map.searching') : t('map.find_place')}
                 value={searchQuery}
                 disabled={isSearching}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </form>
-            <button className={styles.optimizeBtn} onClick={handleOptimizeClick} title="Find a shorter order for this day's stops">
+            <button className={styles.optimizeBtn} onClick={handleOptimizeClick} title={t('map.optimise_hint')}>
               <Icon name="route" size={15} />
-              Optimise
+              {t('map.optimise')}
             </button>
           </div>
         )}
@@ -468,7 +467,7 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
       {/* Stops for the selected day */}
       <section className="section">
         <div className="section-head">
-          <span className="eyebrow">Stops · tap one for directions</span>
+          <span className="eyebrow">{t('map.stops')}</span>
           {getGoogleMapsDirectionsUrl() && (
             <a
               href={getGoogleMapsDirectionsUrl()}
@@ -477,7 +476,7 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
               className="btn btn-sm"
             >
               <Icon name="route" size={15} />
-              Full day in Google Maps
+              {t('map.full_day')}
             </a>
           )}
         </div>
@@ -521,7 +520,7 @@ export const MapPlanner: React.FC<MapPlannerProps> = ({ trip, onRefresh, userRol
                 className="btn btn-sm btn-primary"
               >
                 <Icon name="route" size={15} />
-                Navigate
+                {t('map.navigate')}
               </a>
             </div>
             <GoogleMapEmbed

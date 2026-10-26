@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import styles from './GoogleMapEmbed.module.css';
 import { Icon } from './Icon';
+import { useTranslation } from '@/context/TranslationContext';
 import {
   MapPoint,
   hasPoint,
@@ -22,6 +23,7 @@ interface GoogleMapEmbedProps {
 
 // Real Google map (no API key) for one activity, with a place / route switch.
 export const GoogleMapEmbed: React.FC<GoogleMapEmbedProps> = ({ place, from, transportType, height = 240 }) => {
+  const { t } = useTranslation();
   const canRoute = hasPoint(from);
   const [view, setView] = useState<'place' | 'route'>(canRoute ? 'route' : 'place');
 
@@ -38,10 +40,10 @@ export const GoogleMapEmbed: React.FC<GoogleMapEmbedProps> = ({ place, from, tra
       {canRoute && (
         <div className={`segmented ${styles.switch}`}>
           <button type="button" className={view === 'route' ? 'active' : ''} onClick={() => setView('route')}>
-            Route from previous
+            {t('embed.route_from_previous')}
           </button>
           <button type="button" className={view === 'place' ? 'active' : ''} onClick={() => setView('place')}>
-            Place
+            {t('embed.place')}
           </button>
         </div>
       )}
@@ -58,7 +60,7 @@ export const GoogleMapEmbed: React.FC<GoogleMapEmbedProps> = ({ place, from, tra
       />
 
       <a href={openUrl} target="_blank" rel="noopener noreferrer" className={styles.openLink}>
-        Open in Google Maps
+        {t('embed.open_google')}
         <Icon name="arrowUpRight" size={13} />
       </a>
     </div>

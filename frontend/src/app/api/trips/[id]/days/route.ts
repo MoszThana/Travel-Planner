@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
 import { requireUser, requireTripRole, errorResponse } from '@/lib/access';
+import { logEvent } from '@/lib/events';
 
 export const runtime = 'edge';
 
@@ -46,6 +47,7 @@ export async function POST(
     // Update trip end date
     await db.update(schema.trips).set({ endDate: nextDate.getTime() }).where(eq(schema.trips.id, id));
 
+    await logEvent(db, id, userId, 'day.added', `Day ${newDayNum}`);
     return NextResponse.json({ success: true, dayId, dayNumber: newDayNum });
   } catch (err) {
     return errorResponse(err, `Error adding day to trip ${id}:`);

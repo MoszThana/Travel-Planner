@@ -87,3 +87,9 @@ export function errorResponse(err: unknown, context: string) {
   console.error(context, err);
   return NextResponse.json({ error: err instanceof Error ? err.message : 'Server error' }, { status: 500 });
 }
+
+/** "Day 3" for a day id (used in "What's new" summaries). */
+export async function dayLabel(db: any, dayId: string): Promise<string> {
+  const rows = await db.select({ n: schema.days.dayNumber }).from(schema.days).where(eq(schema.days.id, dayId)).limit(1);
+  return rows[0] ? `Day ${rows[0].n}` : 'a day';
+}

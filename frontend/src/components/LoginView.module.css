@@ -180,3 +180,36 @@
   color: var(--text-muted);
   margin-top: 2px;
 }
+
+/* "Forgot PIN?" / "Back to sign in" */
+.textLink {
+  align-self: center;
+  border: none;
+  background: transparent;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--violet);
+}
+
+.textLink:hover {
+  text-decoration: underline;
+}
+
+.resetHelp {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--primary-soft);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.resetHelp svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--violet);
+}

@@ -1,3 +1,5 @@
+import { toast } from '@/components/Feedback';
+
 const BACKEND_URL = '/api';
 
 // JSON API helper. Throws an Error with the server's message when the request fails.
@@ -17,19 +19,27 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}): P
 
   if (!res.ok) {
     // Session expired or missing: let AuthContext send the user back to login
-    if (res.status === 401 && typeof window !== 'undefined' && !endpoint.startsWith('/users/login')) {
+    if (res.status === 401 && typeof window !== 'undefined' && !endpoint.startsWith('/users/login') && !endpoint.startsWith('/users/reset-pin')) {
       window.dispatchEvent(new Event('auth:expired'));
     }
     const err = await res.json().catch(() => ({})) as any;
-    throw new Error(err.error || `Request failed (${res.status})`);
+    const error = new Error(err.error || `Request failed (${res.status})`) as Error & { code?: string; data?: any };
+    error.code = err.code;
+    error.data = err;
+    throw error;
   }
   return await res.json();
 }
 
-/** Tell the user an action failed. One place to swap for an in-app message later. */
+/** Tell the user an action failed (in-app toast). */
 export function showError(err: unknown, fallback = 'Something went wrong. Please try again.') {
   const message = err instanceof Error && err.message ? err.message : fallback;
-  if (typeof window !== 'undefined') window.alert(message);
+  toast(message, 'error');
+}
+
+/** Confirm that an action worked (in-app toast). */
+export function showSuccess(message: string) {
+  toast(message, 'success');
 }
 
 // Remove data left by the old "offline mode", which saved fake copies in the browser

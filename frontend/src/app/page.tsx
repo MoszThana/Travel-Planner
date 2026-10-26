@@ -10,13 +10,16 @@ import { BudgetTracker } from '@/components/BudgetTracker';
 import { ExpenseSplit } from '@/components/ExpenseSplit';
 import { AIDrawer } from '@/components/AIDrawer';
 import { useAuth } from '@/context/AuthContext';
+import { useTranslation } from '@/context/TranslationContext';
 import { LoginView } from '@/components/LoginView';
+import { WhatsNew, TripEvent } from '@/components/WhatsNew';
 import { apiRequest, showError } from '@/utils/api';
 
 const INVITE_KEY = 'pending_invite';
 
 export default function Home() {
   const { user, authLoading } = useAuth();
+  const { t } = useTranslation();
   const [trips, setTrips] = useState<any[]>([]);
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('home');
@@ -38,31 +41,90 @@ export default function Home() {
     setInviteToken(fromUrl || sessionStorage.getItem(INVITE_KEY));
   }, []);
 
-  // Fetch all trips list
-  const loadTrips = useCallback(async () => {
+  // Fetch all trips list. `silent` = background refresh: keep what's on screen if it fails
+  const loadTrips = useCallback(async (silent = false) => {
     if (!user) return;
-    setTripsError(false);
+    if (!silent) setTripsError(false);
     try {
       const data = await apiRequest('/trips') as any[];
       setTrips(data);
     } catch {
-      setTripsError(true);
+      if (!silent) setTripsError(true);
     } finally {
       setLoading(false);
     }
   }, [user]);
 
-  // Fetch specific trip full details (days, activities, budgets, splits)
-  const loadTripDetails = useCallback(async (tripId: string) => {
-    setTripLoadError(false);
+  // Fetch specific trip full details (days, activities, budgets, splits, events)
+  const loadTripDetails = useCallback(async (tripId: string, silent = false) => {
+    if (!silent) setTripLoadError(false);
     try {
       const data = await apiRequest(`/trips/${tripId}`) as any;
       setActiveTripDetails(data);
     } catch {
-      setActiveTripDetails(null);
-      setTripLoadError(true);
+      if (!silent) {
+        setActiveTripDetails(null);
+        setTripLoadError(true);
+      }
     }
   }, []);
+
+  // Live updates: refresh quietly every 30 s while the page is visible, and right away
+  // when the person comes back to the tab — so everyone sees each other's changes
+  useEffect(() => {
+    if (!user) return;
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (activeTripId) loadTripDetails(activeTripId, true);
+      else loadTrips(true);
+    };
+    const timer = window.setInterval(refresh, 30000);
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [user, activeTripId, loadTrips, loadTripDetails]);
+
+  // "What's new": when this person last looked at each trip's changes (per device)
+  const seenKey = (tripId: string) => `events_seen_${tripId}`;
+  const [seenAt, setSeenAt] = useState(0);
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
+
+  useEffect(() => {
+    if (!activeTripId) return;
+    let stored = 0;
+    try {
+      stored = Number(localStorage.getItem(seenKey(activeTripId)) || 0);
+      if (!stored) {
+        // First visit on this device: start counting from now instead of showing old history as new
+        stored = Date.now();
+        localStorage.setItem(seenKey(activeTripId), String(stored));
+      }
+    } catch {
+      stored = Date.now();
+    }
+    setSeenAt(stored);
+  }, [activeTripId]);
+
+  const tripEvents: TripEvent[] = activeTripDetails?.events || [];
+  const unreadCount = tripEvents.filter((e) => e.createdAt > seenAt && e.userId !== user?.id).length;
+
+  const openWhatsNew = () => {
+    setShowWhatsNew(true);
+  };
+  const closeWhatsNew = () => {
+    setShowWhatsNew(false);
+    const now = Date.now();
+    setSeenAt(now);
+    try {
+      if (activeTripId) localStorage.setItem(seenKey(activeTripId), String(now));
+    } catch {
+      // Storage unavailable: unread state resets on reload
+    }
+  };
 
   // Load trips list on mount
   useEffect(() => {
@@ -79,12 +141,14 @@ export default function Home() {
         setActiveTripId(res.tripId);
         setActiveTab('home');
       } catch (err) {
-        showError(err, "Couldn't join the trip from this invite link.");
+        showError(err, t('page.join_failed'));
       } finally {
         sessionStorage.removeItem(INVITE_KEY);
         setInviteToken(null);
       }
     })();
+    // t() is recreated each render; adding it would re-run the invite acceptance
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, inviteToken, loadTrips]);
 
   // Load trip details when trip selection changes
@@ -119,18 +183,18 @@ export default function Home() {
     if (tripLoadError) {
       return (
         <div className="empty">
-          Couldn&apos;t load this trip. Check your connection and try again.
+          {t('page.trip_load_failed')}
           <div className="btn-row">
-            <button className="btn btn-sm" onClick={handleBackToDashboard}>Back</button>
+            <button className="btn btn-sm" onClick={handleBackToDashboard}>{t('common.back')}</button>
             <button className="btn btn-sm btn-primary" onClick={() => activeTripId && loadTripDetails(activeTripId)}>
-              Retry
+              {t('common.retry')}
             </button>
           </div>
         </div>
       );
     }
     if (!activeTripDetails) {
-      return <div className="empty">Loading trip…</div>;
+      return <div className="empty">{t('common.loading_short')}</div>;
     }
 
     const activeUserMember = activeTripDetails?.members?.find((m: any) => m.id === user?.id);
@@ -184,7 +248,7 @@ export default function Home() {
   };
 
   if (authLoading) {
-    return <div className="empty">Loading…</div>;
+    return <div className="empty">{t('common.loading_short')}</div>;
   }
 
   if (!user) {
@@ -197,11 +261,16 @@ export default function Home() {
         activeTab={activeTripId ? activeTab : undefined}
         onTabChange={setActiveTab}
         onHome={handleBackToDashboard}
+        whatsNew={activeTripId && activeTripDetails ? { unread: unreadCount, onOpen: openWhatsNew } : undefined}
       />
+
+      {showWhatsNew && activeTripDetails && (
+        <WhatsNew events={tripEvents} seenAt={seenAt} currentUserId={user.id} onClose={closeWhatsNew} />
+      )}
 
       {loading ? (
         <div className="empty">
-          Loading…
+          {t('common.loading_short')}
         </div>
       ) : activeTripId ? (
         // Trip Planning active view mode
@@ -211,8 +280,8 @@ export default function Home() {
         </>
       ) : tripsError ? (
         <div className="empty">
-          Couldn&apos;t load your trips. Check your connection and try again.
-          <button className="btn btn-sm btn-primary" onClick={loadTrips}>Retry</button>
+          {t('page.trips_load_failed')}
+          <button className="btn btn-sm btn-primary" onClick={() => loadTrips()}>{t('common.retry')}</button>
         </div>
       ) : (
         // Trips list selection Dashboard mode

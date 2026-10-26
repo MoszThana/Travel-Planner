@@ -437,3 +437,9 @@
 .checkLink:hover {
   text-decoration: underline;
 }
+
+.updatedBy {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: -4px;
+}

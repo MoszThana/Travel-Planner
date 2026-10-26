@@ -1,9 +1,10 @@
 
 import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
-import { eq, inArray } from 'drizzle-orm';
+import { desc, eq, inArray } from 'drizzle-orm';
 import { requireUser, requireTripRole, errorResponse } from '@/lib/access';
 import { CURRENCY_CODES } from '@/utils/money';
+import { logEvent } from '@/lib/events';
 
 export const runtime = 'edge';
 
@@ -62,6 +63,22 @@ export async function GET(
     // Fetch Votes
     const votes = await db.select().from(schema.votes).where(eq(schema.votes.tripId, id));
 
+    // Latest changes for "What's new" (name kept even if the person left the trip)
+    const events = await db.select({
+      id: schema.tripEvents.id,
+      userId: schema.tripEvents.userId,
+      userName: schema.users.name,
+      userAvatar: schema.users.avatarUrl,
+      type: schema.tripEvents.type,
+      summary: schema.tripEvents.summary,
+      createdAt: schema.tripEvents.createdAt,
+    })
+      .from(schema.tripEvents)
+      .leftJoin(schema.users, eq(schema.tripEvents.userId, schema.users.id))
+      .where(eq(schema.tripEvents.tripId, id))
+      .orderBy(desc(schema.tripEvents.createdAt))
+      .limit(30);
+
     return NextResponse.json({
       ...trip,
       days: tripDays,
@@ -70,7 +87,8 @@ export async function GET(
       expenses,
       splits,
       emergency,
-      votes
+      votes,
+      events
     });
   } catch (err) {
     return errorResponse(err, `Error fetching trip ${id}:`);
@@ -110,6 +128,7 @@ export async function PATCH(
     }
 
     await db.update(schema.trips).set(updates).where(eq(schema.trips.id, id));
+    await logEvent(db, id, userId, 'trip.edited', Object.keys(updates).join(', '));
     return NextResponse.json({ success: true });
   } catch (err) {
     return errorResponse(err, `Error updating trip ${id}:`);

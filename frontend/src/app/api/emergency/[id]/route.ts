@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
 import { requireUser, requireTripRole, tripIdForEmergencyContact, errorResponse } from '@/lib/access';
+import { logEvent } from '@/lib/events';
 
 export const runtime = 'edge';
 
@@ -15,9 +16,12 @@ export async function DELETE(
   try {
     const userId = await requireUser(request);
     const db = await getSafeDb();
-    await requireTripRole(db, await tripIdForEmergencyContact(db, id), userId, 'editor');
+    const tripId = await tripIdForEmergencyContact(db, id);
+    await requireTripRole(db, tripId, userId, 'editor');
+    const [before] = await db.select({ name: schema.emergencyContacts.name }).from(schema.emergencyContacts).where(eq(schema.emergencyContacts.id, id)).limit(1);
 
     await db.delete(schema.emergencyContacts).where(eq(schema.emergencyContacts.id, id));
+    await logEvent(db, tripId!, userId, 'contact.deleted', before?.name || 'a contact');
     return NextResponse.json({ success: true });
   } catch (err) {
     return errorResponse(err, `Error deleting emergency contact ${id}:`);

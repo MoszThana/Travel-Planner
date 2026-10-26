@@ -45,7 +45,7 @@ export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, onRefresh, u
       await apiRequest(`/trips/${trip.id}`, { method: 'PATCH', body: JSON.stringify(updates) });
       onRefresh();
     } catch (err) {
-      showError(err, "Couldn't save the budget.");
+      showError(err, t('budget.save_failed'));
       setBudgetInput(trip.budget != null ? String(trip.budget) : '');
     } finally {
       setSavingSettings(false);
@@ -124,14 +124,14 @@ export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, onRefresh, u
       <div className="page-header">
         <h1 className="page-title">{t('budget.title')}</h1>
         <label className={styles.targetField}>
-          Currency
+          {t('budget.currency')}
           <select
             className="input input-sm"
             style={{ width: 'auto' }}
             value={currency}
             disabled={!canEdit || savingSettings}
             onChange={(e) => saveSettings({ currency: e.target.value })}
-            title={canEdit ? 'Currency for this trip' : 'Only editors can change the currency'}
+            title={canEdit ? t('budget.currency_hint') : t('budget.currency_locked')}
           >
             {CURRENCIES.map((c) => (
               <option key={c.code} value={c.code}>{c.code} · {c.label}</option>
@@ -149,13 +149,13 @@ export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, onRefresh, u
         </div>
 
         {hasBudget && (
-          <Gauge value={totalAct} max={targetBudget} caption={`of ${money(targetBudget)} budget`} />
+          <Gauge value={totalAct} max={targetBudget} caption={t('budget.gauge_caption', { amount: money(targetBudget) })} />
         )}
 
         <div className={styles.targetRow}>
-          <span>{hasBudget ? 'Group budget for the whole trip' : 'Set a budget for the whole group'}</span>
+          <span>{hasBudget ? t('budget.budget_group') : t('budget.budget_set')}</span>
           <label className={styles.targetField}>
-            Budget
+            {t('budget.budget')}
             <input
               type="number"
               inputMode="decimal"
@@ -179,7 +179,7 @@ export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, onRefresh, u
               : <span className={styles.statValue}>—</span>}
           </div>
           <div className={styles.statItem}>
-            <span className={styles.statLabel}>Planned</span>
+            <span className={styles.statLabel}>{t('budget.planned')}</span>
             <CountUp value={totalEst} format={money} className={styles.statValue} />
           </div>
           <div className={styles.statItem}>
@@ -195,7 +195,7 @@ export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, onRefresh, u
 
       {/* Category Breakdown */}
       <section className="section">
-        <span className="eyebrow">By category · spent, or planned if not paid yet</span>
+        <span className="eyebrow">{t('budget.by_category')}</span>
         <div className="list lift">
           {Object.entries(categoryTotals).map(([cat, amount]) => {
             const catPercent = categorySum > 0 ? (amount / categorySum) * 100 : 0;
@@ -228,13 +228,13 @@ export const BudgetTracker: React.FC<BudgetTrackerProps> = ({ trip, onRefresh, u
 
       {/* Planned vs spent per day */}
       <section className="section">
-        <span className="eyebrow">Per day · activity costs</span>
+        <span className="eyebrow">{t('budget.per_day')}</span>
         <div className="card lift">
           {hasDayCosts ? (
             <DayChart data={dayData} format={money} />
           ) : (
             <p style={{ fontSize: '14px' }}>
-              Add estimated costs to activities (and the real amount when you check in) to see planned vs spent for each day.
+              {t('budget.per_day_empty')}
             </p>
           )}
         </div>

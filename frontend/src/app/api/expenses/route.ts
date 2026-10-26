@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
 import { requireUser, requireTripRole, errorResponse } from '@/lib/access';
+import { logEvent } from '@/lib/events';
 
 export const runtime = 'edge';
 
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
       )
     ]);
 
+    await logEvent(db, tripId, userId, 'expense.added', `${description} · ${parseFloat(amount).toLocaleString('en-US')}`);
     return NextResponse.json({ success: true, expenseId });
   } catch (err) {
     return errorResponse(err, 'Error adding expense:');

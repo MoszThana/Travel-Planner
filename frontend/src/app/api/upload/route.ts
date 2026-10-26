@@ -3,6 +3,7 @@ import { getSafeDb, schema } from '@/db';
 import { eq } from 'drizzle-orm';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { requireUser, requireTripRole, tripIdForActivity, errorResponse } from '@/lib/access';
+import { logEvent } from '@/lib/events';
 
 export const runtime = 'edge';
 
@@ -93,6 +94,7 @@ export async function POST(request: Request) {
       createdAt: Date.now()
     });
 
+    await logEvent(db, tripId, userId, 'file.added', file.name);
     return NextResponse.json({
       success: true,
       attachmentId,

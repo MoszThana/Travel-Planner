@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSafeDb, schema } from '@/db';
-import { requireUser, requireTripRole, tripIdForDay, errorResponse } from '@/lib/access';
+import { requireUser, requireTripRole, tripIdForDay, dayLabel, errorResponse } from '@/lib/access';
+import { logEvent } from '@/lib/events';
 
 export const runtime = 'edge';
 
@@ -15,7 +16,8 @@ export async function POST(request: Request) {
     if (!dayId || !name) {
       return NextResponse.json({ error: 'Missing dayId or name' }, { status: 400 });
     }
-    await requireTripRole(db, await tripIdForDay(db, dayId), userId, 'editor');
+    const tripId = await tripIdForDay(db, dayId);
+    await requireTripRole(db, tripId, userId, 'editor');
 
     const activityId = crypto.randomUUID();
     await db.insert(schema.activities).values({
@@ -32,9 +34,13 @@ export async function POST(request: Request) {
       actCost: actCost ? parseFloat(actCost) : 0,
       costCategory: costCategory || 'other',
       order: order || 0,
-      visited: 0
+      visited: 0,
+      createdBy: userId,
+      updatedBy: userId,
+      updatedAt: Date.now()
     });
 
+    await logEvent(db, tripId!, userId, 'activity.added', `${name} · ${await dayLabel(db, dayId)}`);
     return NextResponse.json({ success: true, activityId });
   } catch (err) {
     return errorResponse(err, 'Error adding activity:');

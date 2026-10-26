@@ -86,27 +86,45 @@ Problem today: the server trusts whatever user ID the browser sends; anyone can 
 
 ---
 
-## Phase 3 — Easier to use (Ease of use 6 → 8)
+## Phases 3–6 — Every touchpoint to 5/5 (from `TOUCHPOINT_ANALYSIS.md`, 2026-10-26)
 
-- [ ] **3.1 Check-in sheet** — `S` — replace the 3 browser pop-ups with one small form (arrival time, amount spent, note).
-- [ ] **3.2 Edit / delete trip** — `M` — rename, change destination, dates, currency; delete with confirmation (removes days, activities, expenses, votes, contacts, files incl. R2 objects, in one `db.batch`).
-- [ ] **3.3 Delete a day** — `S` — with its activities; renumber remaining days; update trip end date.
-- [ ] **3.4 Friendly messages instead of `alert()` / `confirm()`** — `S` — small toast for success/errors, in-app confirm dialog (9 alerts, 2 confirms today).
-- [ ] **3.5 Complete Thai translation** — `M` — move ~50 hard-coded English texts (forms, buttons, login, AI, members, files) into `locales/en.json` + `th.json`; use the chosen language for dates and numbers.
-- [ ] **3.6 Smaller polish** — `S` — remember last open trip/tab; empty states with a clear next step; loading skeletons instead of "Loading…".
+Average touchpoint score at the start: **~3.0 / 5**. Goal: every touchpoint at 5, plus "delighters" that make the group prefer the app over the LINE chat. Tags like `[B1]` refer to the touchpoint in the analysis. Each phase ships as one batch: build → test locally (with screenshots) → you approve → push.
 
----
+### Phase 3 — Group-ready core (P0: the moments of truth)
 
-## Phase 4 — More useful while travelling (Travel use 6 → 9)
+- [x] **3.1 PIN recovery** `[B1]` — `M` — owner (or any trip owner you share a trip with) creates a one-time 6-digit **reset code** for a member (valid 24 h, shown once, sent by you in LINE); on the login screen "Forgot PIN?" → enter code → choose a new PIN. Codes are stored hashed; the old PIN keeps working until the code is used. Login screen remembers the last profile used on this device.
+- [x] **3.2 Live updates + "What's new"** `[D2]` — `M` — trip data refreshes when you come back to the tab and every 30 s while open; new `trip_events` log written by the API (added / edited / deleted activity, expense, member joined…); a bell in the trip header with an unread dot and a "What's new" list ("Mali added Osaka Castle to Day 2 · 5 min ago"); activity cards show "edited by … · time".
+- [x] **3.3 Check-in sheet** `[F3]` — `S` — one small form (arrived ✓, amount spent, note) instead of 3 browser pop-ups.
+- [x] **3.4 In-app messages & confirm dialogs** `[X2]` — `S` — toasts for success/errors and a styled confirm dialog instead of `alert` / `confirm` / `prompt`.
+- [x] **3.5 Complete Thai translation** `[X1]` — `M` — every visible text in `en.json` + `th.json` (~57 strings today), dates and numbers in the chosen language.
 
-- [ ] **4.1 Install as a phone app + offline itinerary (PWA)** — `L`
-  - Web app manifest + icons (from the map-pin icon), "Add to Home Screen".
-  - Service worker caches the app and the last-viewed trips so the itinerary opens without signal (read-only offline, clearly labelled).
-- [ ] **4.2 Day summary** — `S` — per day: number of stops, first/last time, planned vs. spent, rough travel distance.
-- [ ] **4.3 Export** — `M` — add the itinerary to the phone calendar (`.ics` file) and a print-friendly view (Save as PDF from the browser).
-- [ ] **4.4 Packing checklist** — `M` — per trip, shared with members (new table `checklist_items`).
-- [ ] **4.5 Activity attachments** — `S` — attach tickets/booking PDFs to a specific activity (the DB already supports `activity_id`).
-- [x] **4.6 Invite links** — moved into Phase 2 as task 2.4.
+### Phase 4 — On the trip & money (P1)
+
+- [ ] **4.1 Today view + "Next stop"** `[F1]` — `S` — during the trip the itinerary opens on today and shows a "Next · 14:00 Osaka Castle · Navigate" card; trip list shows "Day 3 of 10" for ongoing trips.
+- [ ] **4.2 Settle up for real** `[G1]` — `M` — "Mark as paid" records a repayment (balances update for everyone); each person can add a **PromptPay** number and the app shows a PromptPay QR for the exact amount owed.
+- [ ] **4.3 Edit / delete trip, dates and days** `[C1–C3]` — `M` — owner renames, changes destination/dates/currency, deletes a trip (everything incl. files); delete a day; **day titles** ("Osaka → Kyoto").
+- [ ] **4.4 My profile** `[A3]` — `S` — change name, picture, PIN, PromptPay number.
+- [ ] **4.5 Stay logged in while active** `[B2]` — `S` — the 7-day session renews itself while you use the site.
+- [ ] **4.6 Install on phone + offline itinerary** `[F5]` — `L` — web app manifest + icons ("Add to Home Screen"); service worker keeps the app and last-viewed trips readable without signal (clearly labelled "offline").
+
+### Phase 5 — Group planning extras (P2)
+
+- [ ] **5.1 Ideas board with voting** `[D3]` — `M` — anyone adds an idea (place, link, note); everyone votes 👍/👎; editors move the winner into a day. Reuses the existing `votes` API.
+- [ ] **5.2 Files done right** `[C7]` — `S` — delete files; attach a file to an activity and see it on the card.
+- [ ] **5.3 Easier inviting** `[A1–A2]` — `S` — editors can create invite links; email optional when creating a profile; nice link preview (image + description) in LINE.
+- [ ] **5.4 Packing list + local emergency numbers** `[E1]` — `M` — shared checklist per trip (who's bringing what); default police/ambulance numbers for the destination country.
+- [ ] **5.5 Quick expense + receipt photo** `[F4]` — `M` — floating "+ Expense" button on the trip; attach a receipt photo to an expense.
+- [ ] **5.6 Second currency view** `[C8]` — `S` — show amounts also in a home currency (e.g. "¥3,000 ≈ ฿700") with a rate the owner sets.
+- [ ] **5.7 Re-time after reorder** `[C5]` — `S` — after drag-and-drop, offer to keep the times in order.
+- [ ] **5.8 Faster activity form** `[C4]` — `S` — quick add (name + time + place) with "more details"; end time; booking/confirmation number field.
+
+### Phase 6 — Delighters ("10 out of 5") (P3)
+
+- [ ] **6.1 Trip summary** `[G2]` — `M` — after the trip: days, places, km, total and per-person cost, best-voted spots; shareable image for the LINE group.
+- [ ] **6.2 Reminders & calendar** `[E2]` — `M` — add the itinerary to the phone calendar (`.ics`); "7 days to go" checklist nudges (who hasn't added flights, packing items unticked).
+- [ ] **6.3 Day summary & print** — `S` — per-day totals and distance; print-friendly view / Save as PDF.
+- [ ] **6.4 Duplicate a trip & photo album link** `[G2]` — `S` — reuse a past plan; link a shared Google Photos/LINE album to the trip.
+- [ ] **6.5 Smaller polish** — `S` — remember last open trip/tab, skeleton loading, empty states with a clear next step.
 
 ---
 

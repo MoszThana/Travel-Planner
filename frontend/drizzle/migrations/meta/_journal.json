@@ -29,6 +29,13 @@
       "when": 1791739440591,
       "tag": "0003_nebulous_the_twelve",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793029908044,
+      "tag": "0004_chubby_spencer_smythe",
+      "breakpoints": true
     }
   ]
 }

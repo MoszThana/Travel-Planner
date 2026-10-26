@@ -3,6 +3,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import styles from './Charts.module.css';
 import { CountUp } from './Motion';
+import { useTranslation } from '@/context/TranslationContext';
 
 /* -------------------------------------------------------------------------
    Gauge: one headline ratio (spent vs budget) as a half circle
@@ -15,13 +16,14 @@ interface GaugeProps {
 }
 
 export const Gauge: React.FC<GaugeProps> = ({ value, max, caption }) => {
+  const { t } = useTranslation();
   const ratio = max > 0 ? value / max : 0;
   const percent = Math.round(ratio * 100);
   const over = ratio > 1;
   const filled = Math.min(Math.max(ratio, 0), 1) * 100;
 
   return (
-    <figure className={styles.gauge} aria-label={`${percent}% ${caption}${over ? ', over budget' : ''}`}>
+    <figure className={styles.gauge} aria-label={`${percent}% ${caption}${over ? ` · ${t('charts.over_budget')}` : ''}`}>
       <svg viewBox="0 0 200 110" className={styles.gaugeSvg} aria-hidden="true">
         <path d="M 16 100 A 84 84 0 0 1 184 100" pathLength={100} className={styles.gaugeTrack} />
         {filled > 0 && (
@@ -36,7 +38,7 @@ export const Gauge: React.FC<GaugeProps> = ({ value, max, caption }) => {
       <figcaption className={styles.gaugeText}>
         <CountUp value={percent} format={(v) => `${Math.round(v)}%`} className={styles.gaugePercent} />
         <span className={styles.gaugeCaption}>{caption}</span>
-        {over && <span className={styles.gaugeAlert}>Over budget</span>}
+        {over && <span className={styles.gaugeAlert}>{t('charts.over_budget')}</span>}
       </figcaption>
     </figure>
   );
@@ -72,6 +74,7 @@ function niceMax(value: number): number {
 }
 
 export const DayChart: React.FC<DayChartProps> = ({ data, format }) => {
+  const { t } = useTranslation();
   const [active, setActive] = useState<number | null>(null);
   const [showTable, setShowTable] = useState(false);
   const plotRef = useRef<HTMLDivElement>(null);
@@ -112,18 +115,18 @@ export const DayChart: React.FC<DayChartProps> = ({ data, format }) => {
     <div className={styles.chart}>
       <div className={styles.chartHead}>
         <div className={styles.legend}>
-          <span className={styles.legendItem}><span className={`${styles.key} ${styles.keySpent}`} />Spent</span>
-          <span className={styles.legendItem}><span className={`${styles.key} ${styles.keyPlanned}`} />Planned</span>
+          <span className={styles.legendItem}><span className={`${styles.key} ${styles.keySpent}`} />{t('charts.spent')}</span>
+          <span className={styles.legendItem}><span className={`${styles.key} ${styles.keyPlanned}`} />{t('charts.planned')}</span>
         </div>
         <button type="button" className={styles.tableToggle} onClick={() => setShowTable((v) => !v)}>
-          {showTable ? 'Show chart' : 'Show as table'}
+          {showTable ? t('charts.show_chart') : t('charts.show_table')}
         </button>
       </div>
 
       {showTable ? (
         <table className={styles.table}>
           <thead>
-            <tr><th>Day</th><th>Planned</th><th>Spent</th></tr>
+            <tr><th>{t('charts.day')}</th><th>{t('charts.planned')}</th><th>{t('charts.spent')}</th></tr>
           </thead>
           <tbody>
             {data.map((d) => (
@@ -146,7 +149,7 @@ export const DayChart: React.FC<DayChartProps> = ({ data, format }) => {
             className={styles.plot}
             tabIndex={0}
             role="img"
-            aria-label={`Planned and spent per day. Use left and right arrow keys to read each day.`}
+            aria-label={t('charts.aria')}
             onPointerMove={(e) => pickIndex(e.clientX)}
             onPointerDown={(e) => pickIndex(e.clientX)}
             onPointerLeave={() => setActive(null)}
@@ -191,9 +194,9 @@ export const DayChart: React.FC<DayChartProps> = ({ data, format }) => {
                   <span className={styles.tooltipTitle}>{point.label}{point.sublabel ? ` · ${point.sublabel}` : ''}</span>
                   <span className={styles.tooltipRow}>
                     <span className={`${styles.key} ${styles.keySpent}`} />
-                    {hasSpentAt(active!) ? <><strong>{format(point.spent)}</strong> spent</> : 'not spent yet'}
+                    {hasSpentAt(active!) ? <><strong>{format(point.spent)}</strong> {t('charts.spent_value')}</> : t('charts.not_spent_yet')}
                   </span>
-                  <span className={styles.tooltipRow}><span className={`${styles.key} ${styles.keyPlanned}`} /><strong>{format(point.planned)}</strong> planned</span>
+                  <span className={styles.tooltipRow}><span className={`${styles.key} ${styles.keyPlanned}`} /><strong>{format(point.planned)}</strong> {t('charts.planned_value')}</span>
                 </div>
               </>
             )}

@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { apiRequest, showError } from '@/utils/api';
+import { apiRequest, showError, showSuccess } from '@/utils/api';
+import { useTranslation } from '@/context/TranslationContext';
 import { useAuth, UserProfile } from '@/context/AuthContext';
 import { Icon } from './Icon';
+import { confirmDialog } from './Feedback';
 
 interface TripMember {
   id: string;
@@ -31,6 +33,7 @@ export const MembersModal: React.FC<MembersModalProps> = ({
   onRefresh
 }) => {
   const { allUsers, refreshProfiles } = useAuth();
+  const { t, locale } = useTranslation();
   const [inviteUserId, setInviteUserId] = useState('');
   const [inviteRole, setInviteRole] = useState<'editor' | 'viewer'>('editor');
   const [saving, setSaving] = useState(false);
@@ -63,6 +66,7 @@ export const MembersModal: React.FC<MembersModalProps> = ({
   const [linkRole, setLinkRole] = useState<'editor' | 'viewer'>('editor');
   const [creatingLink, setCreatingLink] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [resetInfo, setResetInfo] = useState<{ name: string; code: string; expiresAt: number } | null>(null);
 
   const loadInvites = useCallback(async () => {
     try {
@@ -89,7 +93,7 @@ export const MembersModal: React.FC<MembersModalProps> = ({
       });
       await loadInvites();
     } catch (err) {
-      showError(err, "Couldn't create the invite link.");
+      showError(err, t('members.link_failed'));
     } finally {
       setCreatingLink(false);
     }
@@ -100,7 +104,7 @@ export const MembersModal: React.FC<MembersModalProps> = ({
     const url = inviteUrl(token);
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'Join our trip', text: 'Join our trip on Travel Planner:', url });
+        await navigator.share({ title: t('members.share_title'), text: t('members.share_text'), url });
         return;
       }
       await navigator.clipboard.writeText(url);
@@ -108,17 +112,17 @@ export const MembersModal: React.FC<MembersModalProps> = ({
       setTimeout(() => setCopiedToken(null), 2000);
     } catch (err) {
       // Share sheet dismissed by the user is not an error
-      if ((err as any)?.name !== 'AbortError') showError(err, "Couldn't copy the link.");
+      if ((err as any)?.name !== 'AbortError') showError(err, t('members.copy_failed'));
     }
   };
 
   const handleRevokeLink = async (token: string) => {
-    if (!window.confirm('Cancel this invite link? People who already joined stay in the trip.')) return;
+    if (!(await confirmDialog({ title: t('members.cancel_link_title'), message: t('members.cancel_link_message'), confirmLabel: t('members.cancel_link'), cancelLabel: t('members.keep'), danger: true }))) return;
     try {
       await apiRequest(`/trips/${tripId}/invites?token=${encodeURIComponent(token)}`, { method: 'DELETE' });
       await loadInvites();
     } catch (err) {
-      showError(err, "Couldn't cancel the invite link.");
+      showError(err, t('members.cancel_failed'));
     }
   };
 
@@ -135,7 +139,7 @@ export const MembersModal: React.FC<MembersModalProps> = ({
       });
       onRefresh();
     } catch (err: any) {
-      setError(err.message || 'Failed to invite member');
+      setError(err.message || t('members.invite_failed'));
     } finally {
       setSaving(false);
     }
@@ -149,19 +153,38 @@ export const MembersModal: React.FC<MembersModalProps> = ({
       });
       onRefresh();
     } catch (err: any) {
-      alert(err.message || 'Failed to update role');
+      showError(err, t('members.role_failed'));
+    }
+  };
+
+  // One-time code for a member who forgot their PIN; the owner sends it privately
+  const handleResetPin = async (member: TripMember) => {
+    const ok = await confirmDialog({
+      title: t('members.reset_title', { name: member.name }),
+      message: t('members.reset_message'),
+      confirmLabel: t('members.reset_confirm'),
+    });
+    if (!ok) return;
+    try {
+      const res = await apiRequest(`/trips/${tripId}/members/reset-code`, {
+        method: 'POST',
+        body: JSON.stringify({ userId: member.id })
+      });
+      setResetInfo({ name: member.name, code: res.code, expiresAt: res.expiresAt });
+    } catch (err) {
+      showError(err);
     }
   };
 
   const handleRemove = async (userId: string) => {
-    if (!window.confirm('Remove this member from the trip?')) return;
+    if (!(await confirmDialog({ message: t('members.remove_confirm'), confirmLabel: t('common.remove'), cancelLabel: t('common.cancel'), danger: true }))) return;
     try {
       await apiRequest(`/trips/${tripId}/members?userId=${userId}`, {
         method: 'DELETE'
       });
       onRefresh();
     } catch (err: any) {
-      alert(err.message || 'Failed to remove member');
+      showError(err, t('members.remove_failed'));
     }
   };
 
@@ -170,11 +193,45 @@ export const MembersModal: React.FC<MembersModalProps> = ({
     <div className="sheet-overlay" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
-          <h2 className="sheet-title">Trip members</h2>
-          <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">
+          <h2 className="sheet-title">{t('members.title')}</h2>
+          <button type="button" className="btn-icon" onClick={onClose} aria-label={t('common.close')}>
             <Icon name="x" size={18} />
           </button>
         </div>
+
+        {resetInfo && (
+          <div className="card" style={{ background: 'var(--primary-soft)', borderColor: 'transparent', gap: '8px' }}>
+            <span className="eyebrow">{t('members.reset_code_for', { name: resetInfo.name })}</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+              <strong className="tabular" style={{ fontFamily: 'var(--font-display)', fontSize: '30px', letterSpacing: '0.18em' }}>
+                {resetInfo.code.slice(0, 3)} {resetInfo.code.slice(3)}
+              </strong>
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(resetInfo.code);
+                    showSuccess(t('members.code_copied'));
+                  } catch (err) {
+                    showError(err);
+                  }
+                }}
+              >
+                {t('members.copy')}
+              </button>
+            </div>
+            <p style={{ fontSize: '13px' }}>
+              {t('members.reset_instructions', {
+                name: resetInfo.name,
+                time: new Date(resetInfo.expiresAt).toLocaleString(locale === 'th' ? 'th-TH' : 'en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }),
+              })}
+            </p>
+            <button type="button" className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setResetInfo(null)}>
+              {t('members.done')}
+            </button>
+          </div>
+        )}
 
         {/* Member List */}
         <div className="list" style={{ maxHeight: '280px', overflowY: 'auto', flexShrink: 0 }}>
@@ -185,7 +242,7 @@ export const MembersModal: React.FC<MembersModalProps> = ({
                 <img src={member.avatarUrl} alt={member.name} className="avatar" />
                 <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                   <span className="list-title">{member.name}</span>
-                  <span className="list-sub" style={{ textTransform: 'capitalize' }}>{member.role}</span>
+                  <span className="list-sub">{t(`members.${member.role}`)}</span>
                 </div>
               </div>
 
@@ -198,14 +255,22 @@ export const MembersModal: React.FC<MembersModalProps> = ({
                     value={member.role}
                     onChange={(e) => handleUpdateRole(member.id, e.target.value)}
                   >
-                    <option value="editor">Editor</option>
-                    <option value="viewer">Viewer</option>
+                    <option value="editor">{t('members.editor')}</option>
+                    <option value="viewer">{t('members.viewer')}</option>
                   </select>
+                  <button
+                    className="btn-icon"
+                    onClick={() => handleResetPin(member)}
+                    title={t('members.reset_pin')}
+                    aria-label={t('members.reset_pin')}
+                  >
+                    <Icon name="key" size={16} />
+                  </button>
                   <button
                     className="btn-icon danger"
                     onClick={() => handleRemove(member.id)}
-                    title="Remove member"
-                    aria-label="Remove member"
+                    title={t('members.remove')}
+                    aria-label={t('members.remove')}
                   >
                     <Icon name="trash" size={16} />
                   </button>
@@ -213,10 +278,10 @@ export const MembersModal: React.FC<MembersModalProps> = ({
               ) : member.role === 'owner' ? (
                 <span className="chip chip-accent">
                   <Icon name="star" size={11} strokeWidth={2} />
-                  Owner
+                  {t('members.owner')}
                 </span>
               ) : (
-                <span className="chip" style={{ textTransform: 'capitalize' }}>{member.role}</span>
+                <span className="chip">{t(`members.${member.role}`)}</span>
               )}
             </div>
           ))}
@@ -225,9 +290,9 @@ export const MembersModal: React.FC<MembersModalProps> = ({
         {/* Invite links (only for Trip Owners) */}
         {isOwner && (
           <section className="section">
-            <span className="eyebrow">Invite with a link</span>
+            <span className="eyebrow">{t('members.invite_link')}</span>
             <p style={{ fontSize: '13px' }}>
-              Send one link to your group chat. Friends open it, create a profile, and join this trip. Links work for 14 days.
+              {t('members.invite_help')}
             </p>
             <div style={{ display: 'flex', gap: '8px' }}>
               <select
@@ -235,12 +300,12 @@ export const MembersModal: React.FC<MembersModalProps> = ({
                 value={linkRole}
                 onChange={(e) => setLinkRole(e.target.value as 'editor' | 'viewer')}
               >
-                <option value="editor">Can edit the plan</option>
-                <option value="viewer">View only</option>
+                <option value="editor">{t('members.can_edit_plan')}</option>
+                <option value="viewer">{t('members.view_only')}</option>
               </select>
               <button type="button" className="btn btn-primary" onClick={handleCreateLink} disabled={creatingLink}>
                 <Icon name="link" size={15} />
-                {creatingLink ? 'Creating…' : 'Create link'}
+                {creatingLink ? t('members.creating') : t('members.create_link')}
               </button>
             </div>
 
@@ -249,21 +314,21 @@ export const MembersModal: React.FC<MembersModalProps> = ({
                 {invites.map((inv) => (
                   <div key={inv.token} className="list-row">
                     <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                      <span className="list-title">{inv.role === 'editor' ? 'Can edit' : 'View only'}</span>
+                      <span className="list-title">{inv.role === 'editor' ? t('members.can_edit') : t('members.view_only')}</span>
                       <span className="list-sub">
-                        Expires {new Date(inv.expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                        {t('members.expires', { date: new Date(inv.expiresAt).toLocaleDateString(locale === 'th' ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short' }) })}
                       </span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <button type="button" className="btn btn-sm" onClick={() => handleShareLink(inv.token)}>
-                        {copiedToken === inv.token ? <><Icon name="check" size={14} /> Copied</> : 'Share link'}
+                        {copiedToken === inv.token ? <><Icon name="check" size={14} /> {t('members.copied')}</> : t('members.share_link')}
                       </button>
                       <button
                         type="button"
                         className="btn-icon danger"
                         onClick={() => handleRevokeLink(inv.token)}
-                        title="Cancel link"
-                        aria-label="Cancel link"
+                        title={t('members.cancel_link')}
+                        aria-label={t('members.cancel_link')}
                       >
                         <Icon name="x" size={16} />
                       </button>
@@ -278,11 +343,11 @@ export const MembersModal: React.FC<MembersModalProps> = ({
         {/* Add an existing profile (only for Trip Owners) */}
         {isOwner && (
           <section className="section">
-            <span className="eyebrow">Add someone who already has a profile</span>
+            <span className="eyebrow">{t('members.add_existing')}</span>
             {joinableUsers.length > 0 ? (
               <form onSubmit={handleInvite} className="form">
                 <div className="field">
-                  <label className="label">Profile</label>
+                  <label className="label">{t('members.profile')}</label>
                   <select
                     className="input"
                     value={inviteUserId}
@@ -297,14 +362,14 @@ export const MembersModal: React.FC<MembersModalProps> = ({
                 </div>
 
                 <div className="field">
-                  <label className="label">Access</label>
+                  <label className="label">{t('members.access')}</label>
                   <select
                     className="input"
                     value={inviteRole}
                     onChange={(e) => setInviteRole(e.target.value as any)}
                   >
-                    <option value="editor">Editor — can edit activities and days</option>
-                    <option value="viewer">Viewer — read only</option>
+                    <option value="editor">{t('members.editor_long')}</option>
+                    <option value="viewer">{t('members.viewer_long')}</option>
                   </select>
                 </div>
 
@@ -312,24 +377,24 @@ export const MembersModal: React.FC<MembersModalProps> = ({
 
                 <div className="btn-row">
                   <button type="button" className="btn" onClick={onClose}>
-                    Close
+                    {t('common.close')}
                   </button>
                   <button type="submit" disabled={saving} className="btn btn-primary">
-                    {saving ? 'Inviting…' : 'Add to trip'}
+                    {saving ? t('members.inviting') : t('members.add_to_trip')}
                   </button>
                 </div>
               </form>
             ) : (
               <>
-                <p style={{ fontSize: '13px' }}>Everyone with a profile is already on this trip.</p>
-                <button className="btn btn-block" onClick={onClose}>Close</button>
+                <p style={{ fontSize: '13px' }}>{t('members.all_joined')}</p>
+                <button className="btn btn-block" onClick={onClose}>{t('common.close')}</button>
               </>
             )}
           </section>
         )}
 
         {!isOwner && (
-          <button className="btn btn-block" onClick={onClose}>Close</button>
+          <button className="btn btn-block" onClick={onClose}>{t('common.close')}</button>
         )}
       </div>
     </div>
