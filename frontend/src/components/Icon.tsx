@@ -46,6 +46,11 @@ const PATHS: Record<string, React.ReactNode> = {
   bell: (<><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></>),
   info: (<><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></>),
   snow: (<path d="M12 2v20M4.9 7l14.2 10M4.9 17 19.1 7M9 4l3 2 3-2M9 20l3-2 3 2" />),
+  chevronDown: (<path d="m6 9 6 6 6-6" />),
+  utensils: (<><path d="M4 2.5V9a3 3 0 0 0 3 3v9.5M7 2.5V8M10 2.5V9a3 3 0 0 1-3 3" /><path d="M20 15V2.5a5 5 0 0 0-5 5V13a2 2 0 0 0 2 2h3Zm0 0v6.5" /></>),
+  bed: (<><path d="M2.5 19.5V5M2.5 15h19v4.5M21.5 15v-3.5a3 3 0 0 0-3-3H11V15" /><circle cx="6.5" cy="11" r="2" /></>),
+  bag: (<><path d="M5.5 7.5h13l1 13.5h-15l1-13.5Z" /><path d="M9 10V6a3 3 0 0 1 6 0v4" /></>),
+  ticket: (<><path d="M3 8.5V6.5A1.5 1.5 0 0 1 4.5 5h15A1.5 1.5 0 0 1 21 6.5v2a3.5 3.5 0 0 0 0 7v2a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5v-2a3.5 3.5 0 0 0 0-7Z" /><path d="M14 5v2.5M14 11v2M14 16.5V19" /></>),
   grip: (<><circle cx="9" cy="6" r="1" /><circle cx="15" cy="6" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="9" cy="18" r="1" /><circle cx="15" cy="18" r="1" /></>),
 };
 
@@ -85,4 +90,15 @@ export const TRANSPORT_ICONS: Record<string, IconName> = {
   flight: 'plane',
   bus: 'bus',
   other: 'route',
+};
+
+// Activity cost category → icon
+export const CATEGORY_ICONS: Record<string, IconName> = {
+  food: 'utensils',
+  activity: 'ticket',
+  hotel: 'bed',
+  transport: 'train',
+  shopping: 'bag',
+  emergency: 'shield',
+  other: 'info',
 };

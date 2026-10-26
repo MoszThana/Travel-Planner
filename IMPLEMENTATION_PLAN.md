@@ -22,6 +22,7 @@ How we work through it:
 | D4 | Share link: build real invite links, or remove the section (the Members screen already adds people)? | ✅ **Real invite links now** (task 4.6 moved into 2.4) — for a group of ~10 friends | Task 2.4 |
 | D5 | Expense "suggestions" (editors suggest, owner approves): save them in the database, or let editors record expenses directly? | ✅ **Editors record expenses directly**; suggestion queue removed | Task 2.5 |
 | D6 | Get a free Gemini API key for the AI features? | ✅ **No key — hide AI features** | Task 2.2 |
+| D7 | Make it installable on phones ("Add to Home Screen", offline mode)? | ✅ **No — website only.** Friends just open the link in their browser; nothing is installed on their phones | Task 4.6 removed |
 
 ---
 
@@ -78,7 +79,7 @@ Problem today: the server trusts whatever user ID the browser sends; anyone can 
 - [x] **2.6 Budget target saved per trip** — `S` — new `budget` column on `trips` (migration), shared by all members instead of one browser.
 - [x] **2.7 Currency per trip** — `M` — new `currency` column (default `THB`, e.g. `JPY` for Japan); format all amounts with `Intl.NumberFormat`; pick currency when creating/editing a trip.
 - [x] **2.8 No more silent "offline saves"** — `S`
-  - `Dashboard`, `Itinerary`, `ExpenseSplit`, `AIDrawer`, `MapPlanner` write to `localStorage` when the server fails and pretend it worked (e.g. a fake trip with fake members). Replace with a clear error message. Real offline viewing comes in 4.1.
+  - `Dashboard`, `Itinerary`, `ExpenseSplit`, `AIDrawer`, `MapPlanner` write to `localStorage` when the server fails and pretend it worked (e.g. a fake trip with fake members). Replace with a clear error message. Offline viewing is not planned (website only, see D7).
 
 **Done when:** every number and suggestion shown is real, or the feature is clearly hidden.
 
@@ -105,7 +106,6 @@ Average touchpoint score at the start: **~3.0 / 5**. Goal: every touchpoint at 5
 - [ ] **4.3 Edit / delete trip, dates and days** `[C1–C3]` — `M` — owner renames, changes destination/dates/currency, deletes a trip (everything incl. files); delete a day; **day titles** ("Osaka → Kyoto").
 - [ ] **4.4 My profile** `[A3]` — `S` — change name, picture, PIN, PromptPay number.
 - [ ] **4.5 Stay logged in while active** `[B2]` — `S` — the 7-day session renews itself while you use the site.
-- [ ] **4.6 Install on phone + offline itinerary** `[F5]` — `L` — web app manifest + icons ("Add to Home Screen"); service worker keeps the app and last-viewed trips readable without signal (clearly labelled "offline").
 
 ### Phase 5 — Group planning extras (P2)
 
@@ -116,7 +116,7 @@ Average touchpoint score at the start: **~3.0 / 5**. Goal: every touchpoint at 5
 - [ ] **5.5 Quick expense + receipt photo** `[F4]` — `M` — floating "+ Expense" button on the trip; attach a receipt photo to an expense.
 - [ ] **5.6 Second currency view** `[C8]` — `S` — show amounts also in a home currency (e.g. "¥3,000 ≈ ฿700") with a rate the owner sets.
 - [ ] **5.7 Re-time after reorder** `[C5]` — `S` — after drag-and-drop, offer to keep the times in order.
-- [ ] **5.8 Faster activity form** `[C4]` — `S` — quick add (name + time + place) with "more details"; end time; booking/confirmation number field.
+- [x] **5.8 Faster activity form** `[C4]` — `M` — one search box (place search near the trip, or paste a Google Maps link) fills name, pin and category; smart default time; one-tap transport/category; cost, map and notes under "More details"; "Save & add another". _(End time and booking-number field left for later.)_
 
 ### Phase 6 — Delighters ("10 out of 5") (P3)
 
@@ -146,4 +146,4 @@ Average touchpoint score at the start: **~3.0 / 5**. Goal: every touchpoint at 5
 | 1 Safety | ~1–2 sessions | Safe to share the link |
 | 2 Real features | ~1–2 sessions | Nothing fake left |
 | 3 Ease of use | ~1–2 sessions | Smoother everyday use, full Thai |
-| 4 Travel | ~2 sessions | Works like an app, offline |
+| 4 Travel | ~1–2 sessions | Today view, settle up, edit trips |

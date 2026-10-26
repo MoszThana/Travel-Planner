@@ -19,6 +19,16 @@ export const CURRENCIES: { code: string; label: string }[] = [
 
 export const CURRENCY_CODES = CURRENCIES.map((c) => c.code);
 
+/** e.g. currencySymbol('JPY') -> "¥"; falls back to the code */
+export function currencySymbol(currency: string = 'THB', locale: string = 'en'): string {
+  try {
+    const parts = new Intl.NumberFormat(locale === 'th' ? 'th-TH' : 'en-US', { style: 'currency', currency }).formatToParts(0);
+    return parts.find((p) => p.type === 'currency')?.value || currency;
+  } catch {
+    return currency;
+  }
+}
+
 /** e.g. formatMoney(1500, 'JPY') -> "¥1,500"; formatMoney(99.5, 'THB', 'th') -> "฿99.50" */
 export function formatMoney(amount: number | null | undefined, currency: string = 'THB', locale: string = 'en'): string {
   const value = Number(amount) || 0;

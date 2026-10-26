@@ -1,0 +1,259 @@
+/* Search box with icon and clear button */
+.searchWrap {
+  position: relative;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  top: 13px;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.searchInput {
+  padding-left: 40px;
+  padding-right: 40px;
+}
+
+.clearBtn {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+}
+
+.clearBtn:hover {
+  color: var(--text);
+}
+
+.suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  z-index: 2000;
+}
+
+.suggestionItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  transition: background-color var(--transition-fast);
+}
+
+.suggestionItem + .suggestionItem {
+  border-top: 1px solid var(--border);
+}
+
+.suggestionItem:hover,
+.suggestionItem:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+
+.suggestionIcon {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.suggestionText {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.suggestionText strong {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.suggestionText span,
+.suggestionText strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestionTag {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-faint);
+  max-width: 34%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Line under the search box: hint, searching…, or the picked place */
+.placeStatus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 18px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.pinned {
+  color: var(--success);
+}
+
+.placeAddress {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checkLink {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.checkLink:hover {
+  text-decoration: underline;
+}
+
+.nameTimeRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 156px;
+  gap: 12px;
+}
+
+/* One-tap choices */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chipBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.chipBtn:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.chipBtn[aria-pressed='true'] {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+}
+
+.moreToggle {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border: none;
+  background: transparent;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.chevron,
+.chevronOpen {
+  transition: transform var(--transition-fast);
+}
+
+.chevron {
+  transform: rotate(-90deg);
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.costWrap {
+  position: relative;
+}
+
+.costSymbol {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 15px;
+  pointer-events: none;
+}
+
+.costInput {
+  padding-left: 40px;
+}
+
+.mapHint {
+  font-weight: 400;
+  color: var(--text-faint);
+}
+
+.selectMap {
+  width: 100%;
+  height: 200px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  z-index: 1;
+}
+
+@media (max-width: 380px) {
+  .nameTimeRow {
+    grid-template-columns: 1fr;
+  }
+}

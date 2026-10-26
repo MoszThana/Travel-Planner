@@ -493,5 +493,28 @@
   "feedback": {
     "cancel": "Cancel",
     "ok": "OK"
+  },
+  "activityform": {
+    "title_add": "Add to {day}",
+    "where": "Where?",
+    "search_in": "Search a place in {place}…",
+    "search_any": "Search a place…",
+    "paste_hint": "Tip: you can also paste a Google Maps link",
+    "reading_link": "Reading the Google Maps link…",
+    "link_failed": "Couldn't read that link. Try searching by name instead.",
+    "from_link": "From Google Maps link",
+    "pinned": "Pinned on the map",
+    "check": "Check",
+    "no_results": "No places found. Try another name, or tap the map under More details.",
+    "clear": "Clear place",
+    "name": "Name",
+    "name_placeholder": "e.g. Osaka Castle, Free time",
+    "getting_there": "Getting there",
+    "more": "More details (cost, category, map, notes)",
+    "less": "Fewer details",
+    "cost": "Estimated cost",
+    "save_add_another": "Save & add another",
+    "added": "Added {name}",
+    "need_name": "Search a place or type a name."
   }
 }

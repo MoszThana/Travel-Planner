@@ -13,9 +13,10 @@ import { MembersModal } from './MembersModal';
 import { Icon, TRANSPORT_ICONS } from './Icon';
 import { confirmDialog } from './Feedback';
 import { CheckInSheet } from './CheckInSheet';
+import { ActivityForm } from './ActivityForm';
 import { timeAgo } from '@/utils/time';
 import { GoogleMapEmbed } from './GoogleMapEmbed';
-import { hasPoint, googleDirectionsUrl, googlePlaceUrl } from '@/utils/maps';
+import { hasPoint, googleDirectionsUrl } from '@/utils/maps';
 
 interface ItineraryProps {
   trip: any;
@@ -38,30 +39,6 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
   const [editingActivity, setEditingActivity] = useState<any | null>(null);
   const [openMaps, setOpenMaps] = useState<Record<string, boolean>>({});
   const [checkinActivity, setCheckinActivity] = useState<any | null>(null);
-
-  // Form Fields
-  const [name, setName] = useState('');
-  const [time, setTime] = useState('12:00');
-  const [location, setLocation] = useState('');
-  const [notes, setNotes] = useState('');
-  const [transportType, setTransportType] = useState('walk');
-  const [estCost, setEstCost] = useState('0');
-  const [costCategory, setCostCategory] = useState('other');
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState('');
-
-  // Leaflet map select states and refs
-  const [selectedLat, setSelectedLat] = useState<number | null>(null);
-  const [selectedLng, setSelectedLng] = useState<number | null>(null);
-  const [leafletLoaded, setLeafletLoaded] = useState(false);
-  const mapRef = React.useRef<any>(null);
-  const markerRef = React.useRef<any>(null);
-
-  // Suggestions states and refs
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [searching, setSearching] = useState(false);
-  const skipSearchRef = React.useRef(false);
 
   // AI Alerts & Predictions State
   const [gapAlerts, setGapAlerts] = useState<any[]>([]);
@@ -100,192 +77,15 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDayIdx, trip.activities]);
 
-  // Load Leaflet CDN script & styles when form is shown
-  useEffect(() => {
-    if (!showAddForm) return;
-
-    if ((window as any).L) {
-      setLeafletLoaded(true);
-      return;
-    }
-
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(link);
-
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.onload = () => {
-      setLeafletLoaded(true);
-    };
-    document.head.appendChild(script);
-  }, [showAddForm]);
-
-  // Initialize and update selection Leaflet map
-  useEffect(() => {
-    if (!showAddForm || !leafletLoaded) return;
-    const L = (window as any).L;
-    if (!L) return;
-
-    // Use existing coordinates, or fall back to Bangkok center
-    const initialLat = selectedLat || 13.7563;
-    const initialLng = selectedLng || 100.5018;
-
-    const mapContainer = document.getElementById('select-map-container');
-    if (!mapContainer) return;
-
-    // Destroy old instance if exists
-    if (mapRef.current) {
-      mapRef.current.remove();
-      mapRef.current = null;
-      markerRef.current = null;
-    }
-
-    // Initialize Map
-    const map = L.map('select-map-container').setView([initialLat, initialLng], 12);
-    mapRef.current = map;
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-
-    // Place initial marker if coordinates exist
-    if (selectedLat && selectedLng) {
-      markerRef.current = L.marker([selectedLat, selectedLng]).addTo(map);
-    }
-
-    // Handle map click
-    map.on('click', async (e: any) => {
-      const { lat, lng } = e.latlng;
-      
-      // Update coordinates state
-      setSelectedLat(lat);
-      setSelectedLng(lng);
-
-      // Move/Add marker
-      if (markerRef.current) {
-        markerRef.current.setLatLng(e.latlng);
-      } else {
-        markerRef.current = L.marker(e.latlng).addTo(map);
-      }
-
-      // Reverse geocode to find location name using free Nominatim API
-      try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
-          headers: {
-            'User-Agent': 'TravelPlannerAppPrototype/1.0'
-          }
-        });
-        const data = (await res.json()) as any;
-        if (data && data.display_name) {
-          // Fill in Location Name input with fetched address details
-          const namePart = data.name || data.address.road || data.address.suburb || data.address.city || "Selected Location";
-          setLocation(namePart);
-        }
-      } catch (err) {
-        console.warn("Reverse geocoding failed", err);
-      }
-    });
-
-    // Clean up on unmount or form toggle
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-        markerRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showAddForm, leafletLoaded]);
-
-  // Debounced search trigger for Nominatim suggestions
-  useEffect(() => {
-    if (skipSearchRef.current) {
-      skipSearchRef.current = false;
-      return;
-    }
-
-    if (!location.trim() || location.length < 3) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&limit=5`, {
-          headers: {
-            'User-Agent': 'TravelPlannerAppPrototype/1.0'
-          }
-        });
-        const data = (await res.json()) as any[];
-        setSuggestions(data || []);
-        setShowSuggestions(true);
-      } catch (err) {
-        console.warn("Geocoding suggestions failed", err);
-      } finally {
-        setSearching(false);
-      }
-    }, 600); // 600ms debounce
-
-    return () => clearTimeout(timer);
-  }, [location]);
-
-  const handleSelectSuggestion = (item: any) => {
-    skipSearchRef.current = true;
-    const namePart = item.name || item.display_name.split(',')[0];
-    setLocation(namePart);
-
-    const lat = parseFloat(item.lat);
-    const lng = parseFloat(item.lon);
-    setSelectedLat(lat);
-    setSelectedLng(lng);
-    setShowSuggestions(false);
-
-    // Pan map to selection and update marker
-    if (mapRef.current) {
-      mapRef.current.setView([lat, lng], 14);
-      const L = (window as any).L;
-      if (L) {
-        if (markerRef.current) {
-          markerRef.current.setLatLng([lat, lng]);
-        } else {
-          markerRef.current = L.marker([lat, lng]).addTo(mapRef.current);
-        }
-      }
-    }
-  };
-
   if (!isMounted) return <div style={{ padding: 24, textAlign: 'center' }}>{t('common.loading')}</div>;
 
   const handleEditClick = (act: any) => {
     setEditingActivity(act);
-    setName(act.name);
-    setTime(act.time || '12:00');
-    setLocation(act.location || '');
-    setNotes(act.notes || '');
-    setTransportType(act.transportType || 'walk');
-    setEstCost(String(act.estCost || 0));
-    setCostCategory(act.costCategory || 'other');
-    setSelectedLat(act.lat ? parseFloat(act.lat) : null);
-    setSelectedLng(act.lng ? parseFloat(act.lng) : null);
     setShowAddForm(true);
   };
 
   const handleCloseForm = () => {
-    setFormError('');
     setEditingActivity(null);
-    setName('');
-    setTime('12:00');
-    setLocation('');
-    setNotes('');
-    setEstCost('0');
-    setCostCategory('other');
-    setTransportType('walk');
-    setSelectedLat(null);
-    setSelectedLng(null);
     setShowAddForm(false);
   };
 
@@ -327,63 +127,6 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
       showError(err, t('itinerary.reorder_failed'));
     }
     // Reload either way so the list shows what is really saved
-    onRefresh();
-  };
-
-  const handleAddActivity = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError('');
-    if (!name) return;
-    if (!activeDay) {
-      setFormError(t('itinerary.no_days'));
-      return;
-    }
-
-    setSaving(true);
-    const newOrder = activeDayActivities.length + 1;
-    const payload = {
-      dayId: activeDay.id,
-      name,
-      time,
-      notes,
-      location,
-      lat: selectedLat,
-      lng: selectedLng,
-      transportType,
-      estCost: parseFloat(estCost) || 0,
-      costCategory,
-      order: editingActivity ? editingActivity.order : newOrder
-    };
-
-    try {
-      if (editingActivity) {
-        await apiRequest(`/activities/${editingActivity.id}`, {
-          method: 'PUT',
-          body: JSON.stringify(payload)
-        });
-      } else {
-        await apiRequest('/activities', {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
-      }
-    } catch (err) {
-      // Leave the form open so nothing typed is lost
-      setFormError(t('itinerary.save_failed', { error: err instanceof Error ? err.message : '' }));
-      setSaving(false);
-      return;
-    }
-
-    setName('');
-    setTime('12:00');
-    setLocation('');
-    setNotes('');
-    setEstCost('0');
-    setCostCategory('other');
-    setTransportType('walk');
-    setEditingActivity(null);
-    setShowAddForm(false);
-    setSaving(false);
     onRefresh();
   };
 
@@ -715,170 +458,17 @@ export const Itinerary: React.FC<ItineraryProps> = ({ trip, onBack, onRefresh, u
         </button>
       )}
 
-      {/* Add/Edit Activity Modal Sheet */}
-      {showAddForm && (
-        <div className="sheet-overlay" onClick={handleCloseForm}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <div className="sheet-head">
-              <h2 className="sheet-title">{editingActivity ? t('itinerary.edit_activity') : t('itinerary.add_activity')}</h2>
-              <button type="button" className="btn-icon" onClick={handleCloseForm} aria-label={t('common.cancel')}>
-                <Icon name="x" size={18} />
-              </button>
-            </div>
-            <form onSubmit={handleAddActivity} className="form">
-              <div className="field">
-                <label className="label">{t('itinerary.activity_name')}</label>
-                <input
-                  type="text"
-                  required
-                  className="input"
-                  placeholder={t('itinerary.name_placeholder')}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-
-              <div className="field-row">
-                <div className="field">
-                  <label className="label">{t('itinerary.time')}</label>
-                  <input
-                    type="time"
-                    className="input"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                  />
-                </div>
-                <div className="field">
-                  <label className="label">{t('itinerary.transport')}</label>
-                  <select
-                    className="input"
-                    value={transportType}
-                    onChange={(e) => setTransportType(e.target.value)}
-                  >
-                    <option value="walk">{t('itinerary.transport_walk')}</option>
-                    <option value="car">{t('itinerary.transport_car')}</option>
-                    <option value="train">{t('itinerary.transport_train')}</option>
-                    <option value="flight">{t('itinerary.transport_flight')}</option>
-                    <option value="bus">{t('itinerary.transport_bus')}</option>
-                    <option value="other">{t('itinerary.transport_other')}</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="field-row">
-                <div className="field">
-                  <label className="label">{t('itinerary.est_cost')}</label>
-                  <input
-                    type="number"
-                    className="input"
-                    value={estCost}
-                    onChange={(e) => setEstCost(e.target.value)}
-                  />
-                </div>
-                <div className="field">
-                  <label className="label">{t('itinerary.category')}</label>
-                  <select
-                    className="input"
-                    value={costCategory}
-                    onChange={(e) => setCostCategory(e.target.value)}
-                  >
-                    <option value="food">{t('budget.categories.food')}</option>
-                    <option value="transport">{t('budget.categories.transport')}</option>
-                    <option value="hotel">{t('budget.categories.hotel')}</option>
-                    <option value="activity">{t('budget.categories.activity')}</option>
-                    <option value="shopping">{t('budget.categories.shopping')}</option>
-                    <option value="emergency">{t('budget.categories.emergency')}</option>
-                    <option value="other">{t('budget.categories.other')}</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="field">
-                <label className="label">
-                  {t('itinerary.location')}
-                  {searching && <span className={styles.searchingHint}>{t('itinerary.searching')}</span>}
-                </label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder={t('itinerary.location_placeholder')}
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  onFocus={() => {
-                    if (location.trim().length >= 3) {
-                      setShowSuggestions(true);
-                    }
-                  }}
-                />
-
-                {/* Suggestions Overlay Dropdown */}
-                {showSuggestions && suggestions.length > 0 && (
-                  <div className={styles.suggestions}>
-                    {suggestions.map((item, idx) => (
-                      <button
-                        type="button"
-                        key={idx}
-                        className={styles.suggestionItem}
-                        onClick={() => handleSelectSuggestion(item)}
-                      >
-                        <Icon name="pin" size={14} className={styles.suggestionIcon} />
-                        <span className={styles.suggestionText}>
-                          <strong>{item.name || item.display_name.split(',')[0]}</strong>
-                          <span>{item.display_name}</span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Pin on Map selection section */}
-              <div className="field">
-                <label className="label">
-                  {t('itinerary.pin_on_map')}
-                  {selectedLat ? (
-                    <span className="tabular">{selectedLat.toFixed(4)}, {selectedLng?.toFixed(4)}</span>
-                  ) : (
-                    <span>{t('itinerary.tap_map')}</span>
-                  )}
-                </label>
-                <div id="select-map-container" className={styles.selectMap} />
-                {(selectedLat || location.trim()) && (
-                  <a
-                    href={googlePlaceUrl({ location, lat: selectedLat, lng: selectedLng })}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.checkLink}
-                  >
-                    {t('itinerary.check_google')}
-                    <Icon name="arrowUpRight" size={12} />
-                  </a>
-                )}
-              </div>
-
-              <div className="field">
-                <label className="label">{t('itinerary.notes')}</label>
-                <textarea
-                  className="input"
-                  placeholder={t('itinerary.notes_placeholder')}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
-              </div>
-
-              {formError && <div className="form-error">{formError}</div>}
-
-              <div className="btn-row">
-                <button type="button" className="btn" onClick={handleCloseForm}>
-                  {t('common.cancel')}
-                </button>
-                <button type="submit" disabled={saving} className="btn btn-primary">
-                  {saving ? t('common.loading') : t('common.save')}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* Add/Edit Activity */}
+      {showAddForm && activeDay && (
+        <ActivityForm
+          trip={trip}
+          day={activeDay}
+          dayNumber={activeDayIdx + 1}
+          dayActivities={activeDayActivities}
+          activity={editingActivity}
+          onClose={handleCloseForm}
+          onSaved={onRefresh}
+        />
       )}
 
       {checkinActivity && (
